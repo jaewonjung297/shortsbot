@@ -3,16 +3,34 @@
 1. developers.tiktok.com -> Manage apps -> create an app (platform: Desktop), add the products
    "Login Kit" and "Content Posting API", request the scope `video.upload`, and add
    http://localhost:8723/callback/ as a redirect URI.
-2. python scripts/get_tiktok_token.py <client_key> <client_secret>
+2. Put TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET in a .env file at the repo root (it's gitignored), then
+   python scripts/get_tiktok_token.py
+   (or pass them as arguments: python scripts/get_tiktok_token.py <client_key> <client_secret>)
 3. Log in with the TikTok account that will post. Store the printed values as GitHub secrets:
    TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_REFRESH_TOKEN.
 
 Note: while the app is in Sandbox, add your TikTok account as a target user in the developer portal.
 """
-import hashlib, http.server, secrets, sys, threading, urllib.parse, webbrowser
+import hashlib, http.server, os, secrets, sys, threading, urllib.parse, webbrowser
 import requests
 
-KEY, SECRET = sys.argv[1], sys.argv[2]
+def load_dotenv(path=".env"):
+    try:
+        for line in open(path):
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except FileNotFoundError:
+        pass
+
+load_dotenv()
+if len(sys.argv) >= 3:
+    KEY, SECRET = sys.argv[1], sys.argv[2]
+else:
+    KEY, SECRET = os.environ.get("TIKTOK_CLIENT_KEY"), os.environ.get("TIKTOK_CLIENT_SECRET")
+    if not KEY or not SECRET:
+        sys.exit("Set TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET (in .env or your shell), or pass them as arguments.")
 PORT = 8723
 REDIRECT = "http://localhost:%d/callback/" % PORT
 verifier = secrets.token_urlsafe(64)[:64]
@@ -44,7 +62,5 @@ r = requests.post("https://open.tiktokapis.com/v2/oauth/token/", headers={"Conte
                   data={"client_key": KEY, "client_secret": SECRET, "code": got["code"], "grant_type": "authorization_code",
                         "redirect_uri": REDIRECT, "code_verifier": verifier}).json()
 if "refresh_token" not in r: sys.exit("Token exchange failed: %s" % r)
-print("\nTIKTOK_CLIENT_KEY=" + KEY)
-print("TIKTOK_CLIENT_SECRET=" + SECRET)
-print("TIKTOK_REFRESH_TOKEN=" + r["refresh_token"])
+print("\nTIKTOK_REFRESH_TOKEN=" + r["refresh_token"])
 print("(refresh token valid for about %d days)" % (int(r.get("refresh_expires_in", 0)) // 86400))
