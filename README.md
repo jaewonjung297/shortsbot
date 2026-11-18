@@ -21,6 +21,42 @@ history ──▶ │ premise + JSON spec (template, stages,  │ ──▶ vali
                 YouTube Data API upload ─▶ history.json committed back to the repo
 ```
 
+## Instagram Reels (review, then publish)
+
+Instagram's API can't save drafts: anything it uploads is posted publicly right away. So Reels are made in
+two steps, and nothing goes public until you start the second one:
+
+```
+instagram-draft:   idea -> spec -> critic -> render -> package (video, caption, voiceover script, cover)
+                   ...you watch it...
+instagram-publish: host the mp4 on this repo's GitHub Pages -> Instagram fetches it -> Reel is published
+```
+
+**Ways to run it**
+- **Make a draft:** **Actions → instagram-draft → Run workflow**, with an optional premise. The run summary
+  shows the caption, the voiceover script and the exact publish command.
+- **Publish it:** **Actions → instagram-publish → Run workflow** with the draft's run id, or run
+  `gh workflow run instagram-publish.yml -f draft_run_id=<id>`.
+- **Post it yourself instead:** download the draft (`short.mp4` + `caption.txt`) and post it from the
+  Instagram app. Recording your own voiceover there is the best way to keep the account monetisable.
+
+**Instagram setup (once)**
+1. **Make the account professional.** In the Instagram app: Settings → Account type and tools → Switch to
+   professional account (Business or Creator).
+2. **Create a Meta app.** At developers.facebook.com → My Apps → Create app, pick the use case for managing
+   content on Instagram, and choose **API setup with Instagram login**. Add your Instagram account
+   (it gets a tester role; accept the invite in Instagram if asked). Then use **Generate access token** for
+   that account. It needs the permissions `instagram_business_basic` and
+   `instagram_business_content_publish`. You don't need App Review to post to your own account.
+3. **Add the secret.** Store the token as the repo secret `IG_ACCESS_TOKEN`. It lasts 60 days.
+   `instagram-publish` refreshes it on every run; to save the refreshed token automatically, also add a
+   `GH_PAT` secret (a fine-grained token with *Secrets: read and write* on this repo). Otherwise,
+   regenerate the token every ~50 days.
+4. **Turn on GitHub Pages.** Settings → Pages → Source: **GitHub Actions**. This hosts each video
+   temporarily so Instagram can fetch it; only the most recent video stays online.
+
+Limits: Instagram allows up to 100 API-published posts per account per 24 hours, far more than you'll use.
+
 ## TikTok drafts (recommended workflow)
 
 TikTok only pays Creator Rewards for videos **over one minute** and excludes fully automated content, so

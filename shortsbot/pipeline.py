@@ -70,12 +70,13 @@ def run(args):
     history.append(entry); save_history(history)
     with open(os.path.join(outdir, "result.json"), "w") as f: json.dump(entry, f, indent=2, ensure_ascii=False)
 
-def run_tiktok(args):
-    """Human-in-the-loop TikTok draft: write (steerable) -> critic -> render -> package -> optional inbox upload."""
+def run_tiktok(args, platform="tiktok"):
+    """Human-in-the-loop draft for TikTok or Instagram Reels: write (steerable) -> critic -> render -> package.
+    TikTok can also drop the draft into your TikTok inbox; Instagram is published later by instagram-publish."""
     from .tiktok import write_package
     history = load_history()
     stamp = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    outdir = os.path.abspath(args.out or os.path.join(ROOT, "out", "tiktok-" + stamp))
+    outdir = os.path.abspath(args.out or os.path.join(ROOT, "out", platform + "-" + stamp))
     os.makedirs(outdir, exist_ok=True)
     if args.spec:
         spec = json.load(open(args.spec)); spec.setdefault("platform", "tiktok")
@@ -96,10 +97,10 @@ def run_tiktok(args):
     log("premise: %s  [template=%s, %ss]" % (spec["premise"], spec["template"], spec["duration"]))
     contact_sheet(spec, sheet_times(spec), os.path.join(outdir, "preview_final.png"), 0.25)
     video = produce(spec, outdir, workers=args.workers)
-    pkg = write_package(spec, video, outdir)
-    entry = {"date": stamp, "platform": "tiktok", "premise": spec["premise"], "template": spec["template"],
+    pkg = write_package(spec, video, outdir, platform=platform)
+    entry = {"date": stamp, "platform": platform, "cover_time": round(pkg["cover_time"], 2), "premise": spec["premise"], "template": spec["template"],
              "title": spec["title"], "status": "drafted"}
-    if args.send_to_inbox:
+    if getattr(args, "send_to_inbox", False):
         from .tiktok import send_to_inbox
         pid, status = send_to_inbox(video, log=log)
         entry.update(publish_id=pid, status="in_tiktok_inbox" if status else "uploaded")
@@ -130,13 +131,18 @@ def main(argv=None):
     tk.add_argument("--out"); tk.add_argument("--workers", type=int)
     tk.add_argument("--no-review", action="store_true")
     tk.add_argument("--send-to-inbox", action="store_true", help="upload as a draft to your TikTok inbox")
+    ig = sub.add_parser("instagram", help="make an Instagram Reel draft package (publish it later with instagram-publish)")
+    ig.add_argument("--premise"); ig.add_argument("--template", choices=["auto", "car", "window", "hill"], default="auto")
+    ig.add_argument("--spec"); ig.add_argument("--out"); ig.add_argument("--workers", type=int)
+    ig.add_argument("--no-review", action="store_true")
     idp = sub.add_parser("ideas", help="list fresh premise ideas to pick from")
     idp.add_argument("-n", type=int, default=6); idp.add_argument("--platform", default="tiktok")
     v = sub.add_parser("validate"); v.add_argument("spec")
     s = sub.add_parser("sheet"); s.add_argument("spec"); s.add_argument("png")
     a = p.parse_args(argv)
     if a.cmd == "run": run(a)
-    elif a.cmd == "tiktok": run_tiktok(a)
+    elif a.cmd == "tiktok": run_tiktok(a, "tiktok")
+    elif a.cmd == "instagram": run_tiktok(a, "instagram")
     elif a.cmd == "ideas": run_ideas(a)
     elif a.cmd == "validate":
         errs = validate(json.load(open(a.spec))); print("OK" if not errs else "\n".join(errs)); sys.exit(1 if errs else 0)

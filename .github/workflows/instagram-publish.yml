@@ -1,0 +1,73 @@
+name: instagram-publish
+
+# Step 2 of 2: publish a draft you've reviewed. Instagram has no drafts in its API, so this posts publicly.
+on:
+  workflow_dispatch:
+    inputs:
+      draft_run_id:
+        description: "Run id of the instagram-draft run to publish (shown in that run's summary)"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read        # download the draft from the other run
+  pages: write         # host the mp4 on GitHub Pages so Instagram can fetch it
+  id-token: write
+
+concurrency:
+  group: instagram-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install requests
+      - name: Get the reviewed draft
+        uses: actions/download-artifact@v4
+        with:
+          name: reel
+          path: draft
+          run-id: ${{ inputs.draft_run_id }}
+          github-token: ${{ github.token }}
+      - name: Stage the video for GitHub Pages
+        run: |
+          mkdir -p site/v
+          NAME="reel-${{ inputs.draft_run_id }}.mp4"
+          cp draft/short.mp4 "site/v/$NAME"
+          touch site/.nojekyll
+          echo "<!doctype html><title>shortsbot</title><p>Temporary video hosting for shortsbot.</p>" > site/index.html
+          echo "NAME=$NAME" >> "$GITHUB_ENV"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+      - id: deploy
+        uses: actions/deploy-pages@v4
+      - name: Refresh the Instagram token (extends it another 60 days)
+        continue-on-error: true
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          NEW=$(python -m shortsbot.instagram refresh-token)
+          [ -n "$NEW" ] && echo "::add-mask::$NEW"
+          if [ -n "$GH_TOKEN" ] && [ -n "$NEW" ]; then
+            gh secret set IG_ACCESS_TOKEN --body "$NEW" --repo "${{ github.repository }}"
+            echo "Stored the refreshed token."
+          else
+            echo "Token refreshed for this run only. Add a GH_PAT secret to store it automatically, or re-generate the token every ~50 days."
+          fi
+      - name: Publish the Reel
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+        run: |
+          python -m shortsbot.instagram publish --package draft --video-url "${{ steps.deploy.outputs.page_url }}v/$NAME"
+          echo "Published: $(jq -r '.permalink // .media_id' draft/instagram.json)" >> "$GITHUB_STEP_SUMMARY"

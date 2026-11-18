@@ -10,11 +10,14 @@ import requests
 API = "https://open.tiktokapis.com"
 
 # ------------------------------------------------------------------ package
-def write_package(spec, video_path, outdir):
+def write_package(spec, video_path, outdir, platform="tiktok"):
     """caption.txt, voiceover_script.txt (timed lines to read) and cover.jpg next to the video."""
     from .timeline import Timeline
     tl = Timeline(spec)
-    cap = spec.get("tiktok_caption") or spec["description"]
+    if platform == "instagram":
+        cap = spec.get("ig_caption") or spec.get("tiktok_caption") or spec["description"]
+    else:
+        cap = spec.get("tiktok_caption") or spec["description"]
     with open(os.path.join(outdir, "caption.txt"), "w") as f:
         f.write(cap.strip() + "\n")
     lines = ["VOICEOVER SCRIPT - %s" % spec["premise"],
