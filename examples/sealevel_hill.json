@@ -1,0 +1,105 @@
+{
+  "premise": "What if all the ice on Earth melted?",
+  "template": "hill",
+  "seed": 11,
+  "duration": 58,
+  "event_at": 3.6,
+  "start_hour": 17,
+  "counter": {
+    "label": "Sea level rise",
+    "mode": "number",
+    "start": 0,
+    "end": 70,
+    "unit": "m",
+    "decimals": 1,
+    "rate_text": "Ice melting worldwide"
+  },
+  "hours_per_second": 0.05,
+  "pre_label": "Today",
+  "pre_rate_text": "Sea level: normal",
+  "hook": "What if all the ice\non Earth melted?",
+  "final_caption": "This hill used to be\na 20-minute drive inland.",
+  "baseline": {
+    "clouds": 0.45
+  },
+  "stages": [
+    {
+      "label": "Melting begins",
+      "captions": [
+        "Greenland and Antarctica\nhold 99% of Earth's ice."
+      ],
+      "effects": {
+        "heat": 0.3
+      }
+    },
+    {
+      "value": 5,
+      "label": "Beaches gone",
+      "captions": [
+        "A few meters is enough to\nswallow every beach."
+      ],
+      "effects": {
+        "water": 0.05,
+        "rain": 0.3,
+        "clouds": 0.7
+      }
+    },
+    {
+      "value": 15,
+      "label": "Downtown flooded",
+      "captions": [
+        "Streets turn into canals.\nThe power goes out."
+      ],
+      "effects": {
+        "water": 0.18,
+        "power": 0,
+        "rain": 0.5
+      },
+      "snap": [
+        "power"
+      ]
+    },
+    {
+      "value": 30,
+      "label": "Coastal cities lost",
+      "captions": [
+        "Miami, Shanghai, Amsterdam…\nall underwater."
+      ],
+      "effects": {
+        "water": 0.42,
+        "rain": 0.2,
+        "decay": 0.4
+      }
+    },
+    {
+      "value": 45,
+      "label": "Skyscrapers sink",
+      "captions": [
+        "Only the tallest towers\nstill break the surface."
+      ],
+      "effects": {
+        "water": 0.66,
+        "rain": 0
+      }
+    },
+    {
+      "value": 60,
+      "label": "New coastline",
+      "captions": [
+        "Total rise: about 70 meters."
+      ],
+      "effects": {
+        "water": 0.92,
+        "vegetation": 0.6,
+        "clouds": 0.3
+      }
+    }
+  ],
+  "title": "What If All the Ice on Earth Melted? 🌊",
+  "description": "What happens to a coastal town if every glacier and ice sheet melts?",
+  "tags": [
+    "what if",
+    "sea level",
+    "climate"
+  ]
+}

@@ -1,0 +1,77 @@
+name: daily-short
+
+on:
+  # Auto-publishing to YouTube is off by default: fully automated uploads are what YouTube's
+  # inauthentic-content policy targets. Re-enable the schedule only if you review every video.
+  # schedule:
+  #   - cron: "17 15 * * *"
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: "Upload to YouTube"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write                 # lets the job commit history.json so premises never repeat
+
+concurrency:
+  group: daily-short
+  cancel-in-progress: false
+
+jobs:
+  make-short:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System packages (ffmpeg, cairo, fonts)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg libcairo2-dev pkg-config fonts-inter fonts-crosextra-caladea
+          fc-cache -f
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Python packages
+        run: pip install -r requirements.txt
+
+      - name: Write, review, render and publish
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SHORTSBOT_MODEL: ${{ vars.SHORTSBOT_MODEL || 'claude-sonnet-5-5' }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          YT_PRIVACY: ${{ vars.YT_PRIVACY || 'public' }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.upload }}" != "true" ]; then
+            python -m shortsbot run --out out/latest --no-upload
+          else
+            python -m shortsbot run --out out/latest
+          fi
+
+      - name: Keep the video, preview and spec as a build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: short-${{ github.run_id }}
+          path: |
+            out/latest/short.mp4
+            out/latest/preview_*.png
+            out/latest/spec.json
+            out/latest/result.json
+          retention-days: 7
+
+      - name: Commit history
+        if: success()
+        run: |
+          git config user.name "shortsbot"
+          git config user.email "shortsbot@users.noreply.github.com"
+          git add history.json
+          git diff --cached --quiet || git commit -m "history: $(jq -r '.[-1].premise' history.json)"
+          git push

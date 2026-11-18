@@ -1,0 +1,102 @@
+{
+  "premise": "What if the Sun disappeared?",
+  "template": "window",
+  "seed": 3,
+  "duration": 55,
+  "event_at": 3.5,
+  "start_hour": 13,
+  "counter": {
+    "label": "Time since the Sun vanished",
+    "mode": "time",
+    "end_world_seconds": 31560000
+  },
+  "pre_label": "Sunny afternoon",
+  "pre_rate_text": "22 °C outside",
+  "hook": "What if the Sun\nsuddenly disappeared?",
+  "final_caption": "The only light left\nis the one you made.",
+  "baseline": {
+    "clouds": 0.4
+  },
+  "stages": [
+    {
+      "label": "8 minutes of light",
+      "captions": [
+        "Sunlight takes 8 minutes to\nreach us. So for now… nothing."
+      ]
+    },
+    {
+      "world_seconds": 500,
+      "label": "Darkness",
+      "captions": [
+        "Then the sky goes black.\nIn the middle of the day."
+      ],
+      "effects": {
+        "sun_scale": 0,
+        "stars": 0.9,
+        "clouds": 0.1
+      },
+      "snap": [
+        "sun_scale"
+      ]
+    },
+    {
+      "world_seconds": 3600,
+      "label": "The moon is gone too",
+      "captions": [
+        "The Moon only shines with\nreflected sunlight. It vanishes."
+      ],
+      "effects": {
+        "moon_scale": 0
+      }
+    },
+    {
+      "world_seconds": 86400,
+      "label": "Freezing",
+      "captions": [
+        "Without sunlight, temperatures\nfall below freezing in days."
+      ],
+      "effects": {
+        "snow": 0.4,
+        "stars": 1
+      }
+    },
+    {
+      "world_seconds": 604800,
+      "label": "Ice age",
+      "captions": [
+        "Plants die. The river\nstarts to freeze over."
+      ],
+      "effects": {
+        "snow": 0.85
+      }
+    },
+    {
+      "world_seconds": 1500000,
+      "label": "Grid failing",
+      "captions": [
+        "Power plants struggle.\nThe city lights flicker out."
+      ],
+      "effects": {
+        "power": 0,
+        "snow": 1.0
+      }
+    },
+    {
+      "world_seconds": 4000000,
+      "label": "Frozen world",
+      "captions": [
+        "Earth drifts through space,\nfrozen solid."
+      ],
+      "effects": {
+        "decay": 0.4
+      }
+    }
+  ],
+  "title": "What If the Sun Disappeared? ☀️",
+  "description": "What would happen if the Sun vanished?",
+  "tags": [
+    "what if",
+    "sun",
+    "space"
+  ]
+}

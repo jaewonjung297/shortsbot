@@ -1,0 +1,88 @@
+name: tiktok-draft
+
+# Run from GitHub (Actions -> tiktok-draft -> Run workflow), the GitHub mobile app, or:
+#   gh workflow run tiktok.yml -f premise="What if the Moon came twice as close?" -f send_to_inbox=true
+on:
+  workflow_dispatch:
+    inputs:
+      premise:
+        description: "Premise (leave empty to let Claude pick a fresh one)"
+        type: string
+        default: ""
+      template:
+        description: "Scene template"
+        type: choice
+        options: [auto, car, window, hill]
+        default: auto
+      send_to_inbox:
+        description: "Send the video to my TikTok inbox as a draft"
+        type: boolean
+        default: true
+  # Uncomment to get a fresh draft in your TikTok inbox every morning (you still review and post it):
+  # schedule:
+  #   - cron: "23 12 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tiktok-draft
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg libcairo2-dev pkg-config fonts-inter fonts-crosextra-caladea
+          fc-cache -f
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt
+      - name: Write, review, render, package
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SHORTSBOT_MODEL: ${{ vars.SHORTSBOT_MODEL || 'claude-sonnet-5-5' }}
+          TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
+          TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+          TIKTOK_REFRESH_TOKEN: ${{ secrets.TIKTOK_REFRESH_TOKEN }}
+          PREMISE: ${{ inputs.premise }}
+          TEMPLATE: ${{ inputs.template || 'auto' }}
+          INBOX: ${{ github.event_name == 'schedule' || inputs.send_to_inbox }}
+        run: |
+          args=(tiktok --out out/latest --template "$TEMPLATE")
+          [ -n "$PREMISE" ] && args+=(--premise "$PREMISE")
+          [ "$INBOX" = "true" ] && args+=(--send-to-inbox)
+          python -m shortsbot "${args[@]}"
+      - name: Package (video, caption, voiceover script, cover)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiktok-${{ github.run_id }}
+          path: |
+            out/latest/short.mp4
+            out/latest/caption.txt
+            out/latest/voiceover_script.txt
+            out/latest/cover.jpg
+            out/latest/preview_*.png
+            out/latest/spec.json
+          retention-days: 7
+      - name: Job summary
+        if: success()
+        run: |
+          {
+            echo "## $(jq -r .premise out/latest/spec.json)"
+            echo; echo "**Caption**"; echo '```'; cat out/latest/caption.txt; echo '```'
+            echo; echo "**Voiceover script**"; echo '```'; cat out/latest/voiceover_script.txt; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Commit history
+        if: success()
+        run: |
+          git config user.name "shortsbot"; git config user.email "shortsbot@users.noreply.github.com"
+          git add history.json
+          git diff --cached --quiet || git commit -m "tiktok draft: $(jq -r '.[-1].premise' history.json)"
+          git push

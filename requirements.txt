@@ -1,0 +1,9 @@
+pycairo>=1.25
+numpy>=1.26
+scipy>=1.11
+pillow>=10
+anthropic>=0.40
+google-api-python-client>=2.100
+google-auth>=2.23
+google-auth-oauthlib>=1.1
+requests>=2.31

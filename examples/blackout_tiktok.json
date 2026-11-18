@@ -1,0 +1,116 @@
+{
+  "premise": "What if all electronics stopped working?",
+  "template": "car",
+  "seed": 21,
+  "duration": 78,
+  "event_at": 3.8,
+  "start_hour": 21,
+  "counter": {
+    "label": "Time without power",
+    "mode": "time",
+    "end_world_seconds": 3200000000.0
+  },
+  "pre_label": "Grid online",
+  "pre_rate_text": "All systems normal",
+  "hook": "What if all electronics\nstopped working?",
+  "final_caption": "And your phone?\nJust a very nice rock.",
+  "baseline": {
+    "clouds": 0.3
+  },
+  "stages": [
+    {
+      "label": "Blackout",
+      "captions": [
+        "Every screen, light and engine\ndies. All at once.",
+        "Every car on the road\ncoasts to a stop."
+      ],
+      "effects": {
+        "power": 0,
+        "traffic": 0
+      },
+      "snap": [
+        "power",
+        "traffic"
+      ]
+    },
+    {
+      "world_seconds": 60,
+      "label": "Dead silence",
+      "captions": [
+        "No calls. No 911. No internet.\nNobody knows what happened.",
+        "With every light gone, the\nMilky Way appears over the city."
+      ]
+    },
+    {
+      "world_seconds": 3600,
+      "label": "No water",
+      "captions": [
+        "The taps run dry.\nWater pumps need power.",
+        "Morning comes.\nNo alarms. No news."
+      ]
+    },
+    {
+      "world_seconds": 86400,
+      "label": "Spoiling",
+      "captions": [
+        "Every fridge is warm.\nFood starts to spoil."
+      ],
+      "effects": {
+        "decay": 0.2
+      }
+    },
+    {
+      "world_seconds": 604800,
+      "label": "Exodus",
+      "captions": [
+        "Cities empty out.\nPeople head for farmland."
+      ],
+      "effects": {
+        "decay": 0.35,
+        "vegetation": 0.15
+      }
+    },
+    {
+      "world_seconds": 2630000,
+      "label": "Overgrown",
+      "captions": [
+        "Weeds split the asphalt.\nRust eats the cars."
+      ],
+      "effects": {
+        "decay": 0.8,
+        "vegetation": 0.75
+      }
+    },
+    {
+      "world_seconds": 31560000,
+      "label": "Gone wild",
+      "captions": [
+        "Within a year, nature starts\ntaking the streets back."
+      ],
+      "effects": {
+        "decay": 0.9,
+        "vegetation": 0.85
+      }
+    },
+    {
+      "world_seconds": 315600000.0,
+      "label": "Forest city",
+      "captions": [
+        "After 10 years, young trees\ntower over the cars."
+      ],
+      "effects": {
+        "decay": 1.0,
+        "vegetation": 1.0
+      }
+    }
+  ],
+  "title": "What If All Electronics Stopped Working? ⚡",
+  "description": "What if every electronic device on Earth stopped working at once?",
+  "tags": [
+    "what if",
+    "blackout",
+    "electronics"
+  ],
+  "platform": "tiktok",
+  "tiktok_caption": "Every chip, screen and engine on Earth dies at the same moment. Here's the next 100 years. How long would you last? 👇 #whatif #science #blackout #hypothetical"
+}
