@@ -6,7 +6,7 @@ TEMPLATES = ["car", "window", "hill"]
 PLATFORMS = {
     # platform: (min duration, max duration, max stages)
     "youtube": (40, 60, 9),
-    "tiktok": (65, 90, 11),     # TikTok Creator Rewards only pays for videos longer than 1 minute
+    "tiktok": (65, 90, 11),
 }
 RANGES = {"sun_scale": (0, 4), "moon_scale": (0, 10)}
 

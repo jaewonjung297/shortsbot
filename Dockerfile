@@ -1,4 +1,4 @@
-# Alternative to GitHub Actions: run on any container scheduler (Cloud Run Jobs, Fly, ECS, a VPS cron).
+# Container image for running the pipeline outside GitHub Actions.
 FROM python:3.12-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ffmpeg libcairo2-dev pkg-config gcc fonts-inter fonts-crosextra-caladea \

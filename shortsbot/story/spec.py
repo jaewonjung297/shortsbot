@@ -1,4 +1,4 @@
-"""Story video spec: what Claude writes from a pasted Reddit post, and the validator that keeps it renderable."""
+"""Story spec schema and validator."""
 import re
 
 SCENES = {

@@ -15,7 +15,7 @@ on:
         type: choice
         options: [auto, car, window, hill]
         default: auto
-  # Uncomment for a fresh draft every morning (you still review and publish it):
+  # daily draft:
   # schedule:
   #   - cron: "23 12 * * *"
 

@@ -1,4 +1,4 @@
-"""Narration with Kokoro (open-weight TTS, runs on CPU) + estimated per-word timings for the captions."""
+"""Kokoro TTS narration and estimated per-word caption timings."""
 import json, os, re, urllib.request
 import numpy as np
 
@@ -50,7 +50,7 @@ def narrate(spec, outdir, log=print):
         dur = len(x) / SR
         words = L["text"].split(); ww = _weights(words)
         cum = np.concatenate([[0], np.cumsum(ww)]) / ww.sum() * (dur - 0.08) + 0.03
-        hold = 1.2 if L["scene"] == "phone" else 0.0          # give viewers time to read texts
+        hold = 1.2 if L["scene"] == "phone" else 0.0          # extra hold on text-message shots
         gap = (0.38 if i < n - 1 else 1.6) + hold
         lines.append(dict(i=i, start=round(t, 3), end=round(t + dur, 3), shot_end=round(t + dur + gap, 3),
                           words=[dict(w=words[j], a=round(t + cum[j], 3), b=round(t + cum[j + 1], 3)) for j in range(len(words))]))

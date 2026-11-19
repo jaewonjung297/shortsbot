@@ -1,4 +1,4 @@
-"""Claude turns a pasted Reddit post into a narrated shot list (spec), repairing it until it validates."""
+"""Reddit post -> story spec via Claude, retried until it validates."""
 import json, os, re
 from .spec import SCHEMA, SCENES, LOOKS, SHIRTS, HAIR, EMOTIONS, POSES, FX, validate, word_count
 

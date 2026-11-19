@@ -1,6 +1,6 @@
 name: instagram-publish
 
-# Step 2 of 2: publish a draft you've reviewed. Instagram has no drafts in its API, so this posts publicly.
+# Step 2 of 2: publish a reviewed draft (posts publicly).
 on:
   workflow_dispatch:
     inputs:
@@ -11,8 +11,8 @@ on:
 
 permissions:
   contents: read
-  actions: read        # download the draft from the other run
-  pages: write         # host the mp4 on GitHub Pages so Instagram can fetch it
+  actions: read        # download the draft artifact
+  pages: write         # host the mp4 on GitHub Pages
   id-token: write
 
 concurrency:

@@ -8,8 +8,7 @@
    (or pass them as arguments: python scripts/get_tiktok_token.py <client_key> <client_secret>)
 3. Log in with the TikTok account that will post. Store the printed values as GitHub secrets:
    TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_REFRESH_TOKEN.
-
-Note: while the app is in Sandbox, add your TikTok account as a target user in the developer portal.
+   In Sandbox, add your account as a target user first.
 """
 import hashlib, http.server, os, secrets, sys, threading, urllib.parse, webbrowser
 import requests

@@ -71,8 +71,7 @@ def run(args):
     with open(os.path.join(outdir, "result.json"), "w") as f: json.dump(entry, f, indent=2, ensure_ascii=False)
 
 def run_tiktok(args, platform="tiktok"):
-    """Human-in-the-loop draft for TikTok or Instagram Reels: write (steerable) -> critic -> render -> package.
-    TikTok can also drop the draft into your TikTok inbox; Instagram is published later by instagram-publish."""
+    """Draft for TikTok or Instagram: write -> critic -> render -> package (optional TikTok inbox upload)."""
     from .tiktok import write_package
     history = load_history()
     stamp = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")

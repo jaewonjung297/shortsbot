@@ -1,12 +1,4 @@
-"""Instagram Reels publishing (Instagram API with Instagram Login).
-
-Instagram's API has no drafts: a published Reel goes straight to your profile. So shortsbot splits it
-into two workflows: `instagram-draft` renders the video for you to review, and `instagram-publish`
-posts a reviewed draft only when you start it.
-
-Instagram fetches the video from a public URL, so the publish workflow first puts the mp4 on the repo's
-GitHub Pages site (gh-pages branch) and passes that URL here.
-"""
+"""Instagram Reels publishing from a public video URL (Instagram API with Instagram Login)."""
 import json, os, time
 import requests
 
@@ -24,8 +16,7 @@ def _check(r):
     return data
 
 def refresh_token(log=print):
-    """Long-lived tokens last 60 days; refreshing (allowed once the token is 24 h old) extends them.
-    Returns the new token so a workflow can store it."""
+    """Refresh the long-lived token; returns the new token."""
     r = requests.get(API + "/refresh_access_token", params={"grant_type": "ig_refresh_token", "access_token": _token()}, timeout=30)
     data = _check(r)
     days = int(data.get("expires_in", 0)) // 86400
@@ -37,7 +28,7 @@ def me():
     return _check(r)
 
 def wait_for_url(url, log=print, timeout=300):
-    """GitHub Pages takes a minute or two to deploy; wait until the video is reachable."""
+    """Wait until the URL is reachable."""
     t_end = time.time() + timeout
     while time.time() < t_end:
         try:

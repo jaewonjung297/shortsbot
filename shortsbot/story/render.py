@@ -127,7 +127,7 @@ def camera(line, u):
         who = cam.split(":")[1] if ":" in cam else (chars[0]["who"] if chars else "me")
         c = next((c for c in chars if c["who"] == who), chars[0] if chars else {"x": 0.5})
         x = char_x(c)
-        a, b = (x, 900, 1.9), (x, 890, 2.1)
+        a, b = (x, 1100, 2.4), (x, 1090, 2.7)   # head and shoulders
     elif cam == "medium": a, b = (540, 1050, 1.35), (540, 1020, 1.5)
     elif cam == "push": a, b = (540, 1150, 1.0), (540, 1000, 1.45)
     else: a, b = (560, 1150, 1.0), (560, 1150, 1.08)

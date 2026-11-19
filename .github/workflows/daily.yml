@@ -1,8 +1,7 @@
 name: daily-short
 
 on:
-  # Auto-publishing to YouTube is off by default: fully automated uploads are what YouTube's
-  # inauthentic-content policy targets. Re-enable the schedule only if you review every video.
+  # schedule off by default
   # schedule:
   #   - cron: "17 15 * * *"
   workflow_dispatch:
@@ -13,7 +12,7 @@ on:
         default: true
 
 permissions:
-  contents: write                 # lets the job commit history.json so premises never repeat
+  contents: write                 # commit history.json
 
 concurrency:
   group: daily-short
