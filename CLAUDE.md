@@ -76,8 +76,10 @@ Apt packages come from `.github/actions/system-packages` (cached .debs, fallback
 Narration: Kokoro at <= 1.15x (`TTS_SPEED`), then ffmpeg `atempo` up to the spec speed (default 1.575); Kokoro itself
 swallows first words and slurs above ~1.3x. Caption groups are capped at 14 characters so text stays full size.
 `in_this_town` (pitch/bible/spec) tested locally against the live API (Nov 19 2026): pitches 18 s, bible ~1-4 min,
-spec ~1 min, 83 s render; not yet run on GitHub Actions. Its Claude calls use structured outputs (`output_config.format`,
-JSON schemas in `town.py`); forced tool use 400s on Sonnet 5.5. Narration length model: `spec.estimate_seconds`
+spec ~1 min, 83 s render. On GitHub (branch `in-this-town-showrunner`): pitch run 44577284084, bible run 44577462020,
+approved render run 44578837126 (60 s target, 69.0 s video). Pitch and bible calls use structured outputs
+(`output_config.format`, JSON schemas in `town.py`); forced tool use 400s on Sonnet 5.5. The spec call is plain JSON:
+with a schema Claude stopped after 2 lines. The code copies each beat's voiceover into its line. Narration length model: `spec.estimate_seconds`
 (syllables + pauses, fitted on renders). Renderer extras for rules: kid looks, `sign`, per-char `hair`/`aura`/`float`/
 `scale`, fx `golden`/`dusk`/`haze`.
 kokoro-onnx/onnxruntime may lack wheels for brand-new Pythons (3.15); use 3.11/3.12. Characters must stay
