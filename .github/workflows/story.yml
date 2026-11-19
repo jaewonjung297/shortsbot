@@ -1,24 +1,30 @@
 name: story
 
-# Paste a Reddit post -> narrated blocky-character video -> TikTok inbox draft.
+# Modes: reddit_story (paste a post), in_this_town (premise, optional), what_if (premise, optional) -> TikTok inbox draft.
 # Start it with the terminal command (scripts/story), from Actions -> story -> Run workflow, or:
 #   gh workflow run story.yml -f story="$(pbpaste)"
+#   gh workflow run story.yml -f mode=in_this_town -f story="everyone parties except me"
 #   gh workflow run story.yml -f example=story_cat -f send_to_inbox=false      # skip Claude, use examples/story_cat.json
-run-name: "story: ${{ inputs.label || inputs.example || inputs.from_run || 'pasted post' }}"
+run-name: "${{ inputs.mode || 'reddit_story' }}: ${{ inputs.label || inputs.example || inputs.from_run || 'new video' }}"
 
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: "Format"
+        type: choice
+        options: [reddit_story, in_this_town, what_if]
+        default: reddit_story
       story:
-        description: "The Reddit post (title + body)"
+        description: "reddit_story: the Reddit post. in_this_town / what_if: a premise (optional)"
         type: string
         default: ""
       example:
-        description: "Or: name of a spec in examples/ (e.g. story_cat), skips Claude"
+        description: "Developer test: spec name in examples/ (leave empty)"
         type: string
         default: ""
       from_run:
-        description: "Or: id of an earlier story run whose spec to reuse, skips Claude"
+        description: "Re-render: id of an earlier run whose spec to reuse (leave empty)"
         type: string
         default: ""
       notes:
@@ -40,7 +46,7 @@ on:
         type: boolean
         default: true
       label:
-        description: "Short label for the run list (set by the CLI)"
+        description: "Name for this run (optional)"
         type: string
         default: ""
 
@@ -51,8 +57,20 @@ env:
   PYTHON: "3.12"
 
 jobs:
+  what_if:
+    name: "what if (legacy pipeline)"
+    if: inputs.mode == 'what_if'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/tiktok.yml
+    with:
+      premise: ${{ inputs.story }}
+      send_to_inbox: ${{ inputs.send_to_inbox }}
+    secrets: inherit
+
   condense:
     name: "1 · condense (Claude)"
+    if: inputs.mode != 'what_if'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -77,16 +95,17 @@ jobs:
           EXAMPLE: ${{ inputs.example }}
           NOTES: ${{ inputs.notes }}
           VOICE: ${{ inputs.voice }}
+          MODE: ${{ inputs.mode || 'reddit_story' }}
         run: |
           mkdir -p work
           if [ -f work/spec.json ]; then
             echo "using spec from run ${{ inputs.from_run }}"
-          elif [ -n "$EXAMPLE" ]; then
+          elif [ -n "$EXAMPLE" ] && [ -z "$STORY" ]; then
             cp "examples/${EXAMPLE%.json}.json" work/spec.json
           else
-            [ -n "$STORY" ] || { echo "::error::paste a story or name an example"; exit 1; }
-            printf '%s\n' "$STORY" > work/story.txt
-            args=(condense --story work/story.txt --dir work)
+            [ -n "$STORY" ] || [ "$MODE" != reddit_story ] || { echo "::error::paste a Reddit post into the story box"; exit 1; }
+            args=(condense --mode "$MODE" --dir work)
+            if [ -n "$STORY" ]; then printf '%s\n' "$STORY" > work/story.txt; args+=(--story work/story.txt); fi
             [ -n "$NOTES" ] && args+=(--notes "$NOTES")
             python -m shortsbot.story "${args[@]}"
           fi
@@ -115,6 +134,8 @@ jobs:
         with: { python-version: "${{ env.PYTHON }}", cache: pip }
       - uses: actions/cache@v4
         with: { path: ~/.cache/kokoro, key: kokoro-v1.0 }
+      - uses: ./.github/actions/system-packages
+        with: { packages: ffmpeg, key: assemble }
       - run: pip install numpy kokoro-onnx soundfile
       - uses: actions/download-artifact@v4
         with: { name: spec, path: work }

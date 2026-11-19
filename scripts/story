@@ -5,6 +5,8 @@
   pbpaste | scripts/story            # from the clipboard
   scripts/story post.txt             # from a file
   scripts/story --example story_cat  # skip Claude, render examples/story_cat.json
+  scripts/story --mode in_this_town --premise "everyone parties except me"
+  scripts/story --mode what_if --premise "What if the Moon came twice as close?"
   scripts/story --from-run 123456789 # skip Claude, re-render the spec from an earlier run
   scripts/story --no-inbox --notes "keep it light" --voice am_adam post.txt
 
@@ -22,7 +24,9 @@ def gh(*args, capture=True):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("file", nargs="?", help="text file with the post (default: read stdin)")
+    p.add_argument("file", nargs="?", help="text file with the post or premise (default: read stdin)")
+    p.add_argument("--mode", default="reddit_story", choices=["reddit_story", "in_this_town", "what_if"])
+    p.add_argument("--premise", help="premise for in_this_town / what_if (default: Claude invents one)")
     p.add_argument("--example", help="render a spec from examples/ instead of condensing a post")
     p.add_argument("--from-run", help="reuse the spec from an earlier story run instead of condensing a post")
     p.add_argument("--notes", default="", help="notes for Claude (tone, emphasis)")
@@ -33,21 +37,23 @@ def main():
     a = p.parse_args()
 
     story = ""
-    if not (a.example or a.from_run):
+    if a.mode != "reddit_story":
+        story = a.premise or (open(a.file).read().strip() if a.file else "")
+    elif not (a.example or a.from_run):
         if a.file: story = open(a.file).read()
         else:
             if sys.stdin.isatty(): print("Paste the post, then press Ctrl-D:\n", file=sys.stderr)
             story = sys.stdin.read()
         story = story.strip()
         if len(story) < 200: sys.exit("That post looks too short (%d chars)." % len(story))
-    label = a.example or (("rerender " + a.from_run) if a.from_run else None) or (story.splitlines()[0][:60] if story else "post")
+    label = a.example or (story[:60] if a.mode != "reddit_story" else None) or (("rerender " + a.from_run) if a.from_run else None) or (story.splitlines()[0][:60] if story else "post")
     ref = a.ref or subprocess.run(["git", "branch", "--show-current"], cwd=ROOT, text=True, capture_output=True).stdout.strip() or "main"
 
-    args = ["workflow", "run", WORKFLOW, "--ref", ref, "-f", "label=" + label, "-f", "voice=" + a.voice,
+    args = ["workflow", "run", WORKFLOW, "--ref", ref, "-f", "mode=" + a.mode, "-f", "label=" + (label or "fresh idea"), "-f", "voice=" + a.voice,
             "-f", "parts=" + a.parts, "-f", "send_to_inbox=" + ("false" if a.no_inbox else "true")]
     if a.example: args += ["-f", "example=" + a.example]
     elif a.from_run: args += ["-f", "from_run=" + a.from_run]
-    else: args += ["-f", "story=" + story]
+    elif story: args += ["-f", "story=" + story]
     if a.notes: args += ["-f", "notes=" + a.notes]
     started = time.time()
     gh(*args)
@@ -69,8 +75,9 @@ def main():
         print("\nThe run failed. Failed steps' logs:\n")
         subprocess.run(["gh", "run", "view", rid, "--log-failed"], cwd=ROOT)
         sys.exit(1)
-    out = os.path.join(ROOT, "out", "story-" + rid)
-    gh("run", "download", rid, "--name", "story-" + rid, "--dir", out)
+    name = ("tiktok-" if a.mode == "what_if" else "story-") + rid
+    out = os.path.join(ROOT, "out", name)
+    gh("run", "download", rid, "--name", name, "--dir", out)
     print("\nDone. Files in %s" % out)
     for f in ("short.mp4", "caption.txt", "cover.jpg"):
         if os.path.exists(os.path.join(out, f)): print("  " + f)

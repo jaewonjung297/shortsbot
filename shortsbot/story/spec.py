@@ -5,6 +5,7 @@ SPEED = 1.575                  # default narration speed (Kokoro)
 WORDS = (300, 360)             # target narration words at SPEED (about 65-85 s)
 WORDS_OK = (280, 380)          # accepted range at SPEED
 LINES = (18, 34)
+MODES = ["reddit_story", "in_this_town"]
 
 def word_range(speed=SPEED, rng=WORDS):
     """Word range scaled to the narration speed."""
@@ -18,7 +19,7 @@ SCENES = {
     "living": "living room with a sofa and TV",
     "kitchen": "kitchen with counters and a fridge (good for arguments)",
     "window": "someone alone by a rainy window (sad/reflective moments)",
-    "exterior": "street of houses from outside (establishing shots, no characters)",
+    "exterior": "street of houses from outside; characters optional (use fx 'night' for night, 'party' for party lights)",
     "phone": "full-screen text-message conversation; needs 'contact' and 'messages'",
 }
 LOOKS = {"young_woman": "long hair", "young_man": "short hair", "older_woman": "hair in a bun", "older_man": "short gray hair"}
@@ -34,7 +35,8 @@ CAMS = ["wide", "medium", "push", "closeup"]
 FX = {"hearts": "floating hearts", "sweat": "sweat drop on the first character", "tears": "tears on the first character",
       "shake": "screen shake", "punch": "quick zoom punch on the cut", "redflash": "pulsing red tint (anger)",
       "cold": "blue tint + shivering", "desat": "gloomy desaturated tint", "memory": "warm flashback glow",
-      "dark": "vignette closing in (ominous)", "fluff": "fluff/mess flying around (chaos)"}
+      "dark": "vignette closing in (ominous)", "fluff": "fluff/mess flying around (chaos)",
+      "night": "night sky with moon and stars (exterior)", "party": "pulsing colored party lights"}
 
 SCHEMA = """
 {
@@ -64,6 +66,7 @@ def validate(spec):
     for k in ("title", "tiktok_caption", "cast", "lines"):
         if k not in spec: errs.append("missing key: %s" % k)
     if errs: return errs
+    if spec.get("mode", "reddit_story") not in MODES: errs.append("mode must be one of %s" % MODES)
     cast = spec["cast"]
     if "me" not in cast: errs.append("cast must include 'me' (the narrator)")
     if not (1 <= len(cast) <= 4): errs.append("cast needs 1-4 people")

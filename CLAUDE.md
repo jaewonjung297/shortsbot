@@ -16,8 +16,12 @@ local, gitignored `.env` (see `.env.example`); GitHub secrets are write-only and
 2. **Format: narrated Reddit stories** (r/AmIOverreacting style) in an **imitation-Roblox look**: blocky,
    Roblox-style characters that are original designs (no Roblox assets, avatars, names or logos). The user
    pastes a post; Claude condenses it **in its own words** into a shot list; the characters act it out with big
-   word-by-word captions (white, black outline, current word yellow) and a TTS narrator. "What if…?" videos are
-   legacy: keep the code working but don't develop it.
+   word-by-word captions (white, black outline, current word yellow) and a TTS narrator.
+   **Modes** (`story.yml` input `mode`, `scripts/story --mode`): `reddit_story` (default), `in_this_town`
+   (Claude writes 3-4 deadpan "In this town, everybody... Except me." bits from an optional premise; same renderer),
+   and `what_if` (legacy "What if…?" pipeline, run via `tiktok.yml` as a reusable workflow; keep working, don't develop).
+   **Every condensed video** (both modes) opens with "In this town, everyone goes HUSS HUSS." and has >= 3 more
+   "HUSS HUSS"; Reddit stories are reframed as happening in that town. Enforced in `condense.format_errors`.
 3. **Human in the loop:** videos go to the TikTok inbox as **drafts** (Upload mode); the user adds their own
    voice/edits and posts from the app. Don't build auto-publishing: platforms demonetize mass-produced,
    unattended AI content, and narrated Reddit stories with TTS are a named risk.
@@ -63,8 +67,10 @@ Verified locally (macOS, Python 3.11 venv in `.venv`, brew ffmpeg): narrate -> p
 gives a 76.7 s 1080x1920 video at -14.3 LUFS in ~55 s with 6 render processes. Fixed: close-ups now frame head and
 shoulders so the caption no longer covers the eyes.
 Not yet verified: `condense` against the live Claude API (first run with a real pasted post).
-Known issue: render jobs sometimes spend 10-25 min in `apt-get install` (slow Ubuntu mirror); caching the apt
-packages would fix it.
+Apt packages come from `.github/actions/system-packages` (cached .debs, fallback mirrors).
+Narration: Kokoro at <= 1.15x (`TTS_SPEED`), then ffmpeg `atempo` up to the spec speed (default 1.575); Kokoro itself
+swallows first words and slurs above ~1.3x. Caption groups are capped at 14 characters so text stays full size.
+`in_this_town` tested locally (Nov 19 2026): valid spec after JSON repairs, 86 s narration, night/party exterior.
 kokoro-onnx/onnxruntime may lack wheels for brand-new Pythons (3.15); use 3.11/3.12. Characters must stay
 **original** (not Roblox's avatars/branding).
 

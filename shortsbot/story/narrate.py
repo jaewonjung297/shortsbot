@@ -1,11 +1,12 @@
 """Kokoro TTS narration and estimated per-word caption timings."""
-import json, os, re, urllib.request
+import json, os, re, subprocess, urllib.request
 import numpy as np
 from .spec import SPEED
 
 SR = 24000
 MODEL_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/"
 FILES = ["kokoro-v1.0.int8.onnx", "voices-v1.0.bin"]
+TTS_SPEED = 1.15   # fastest clean Kokoro speed; faster narration is time-stretched with ffmpeg
 
 def model_dir():
     d = os.environ.get("KOKORO_DIR", os.path.expanduser("~/.cache/kokoro"))
@@ -36,6 +37,14 @@ def _trim(x, thr=0.012):
     if not len(idx): return x
     return x[max(0, idx[0] - 600): min(len(x), idx[-1] + 1200)]
 
+def _stretch(x, tempo):
+    """Speed up audio without changing pitch (ffmpeg atempo)."""
+    if abs(tempo - 1) < 0.01: return x
+    p = subprocess.run(["ffmpeg", "-v", "error", "-f", "f32le", "-ar", str(SR), "-ac", "1", "-i", "pipe:0",
+                        "-af", "atempo=%.4f" % tempo, "-f", "f32le", "pipe:1"], input=x.astype(np.float32).tobytes(),
+                       capture_output=True, check=True)
+    return np.frombuffer(p.stdout, dtype=np.float32)
+
 def _weights(words):
     w = []
     for j, wd in enumerate(words):
@@ -59,8 +68,8 @@ def narrate(spec, outdir, log=print):
     audio, lines, t = [np.zeros(int(0.35 * SR))], [], 0.35
     n = len(spec["lines"])
     for i, L in enumerate(spec["lines"]):
-        samples, _ = k.create(spoken(L["text"]), voice=voice, speed=speed, lang="en-us")
-        x = _trim(np.asarray(samples, dtype=np.float32))
+        samples, _ = k.create(spoken(L["text"]), voice=voice, speed=min(speed, TTS_SPEED), lang="en-us")
+        x = _trim(_stretch(np.asarray(samples, dtype=np.float32), speed / min(speed, TTS_SPEED)))
         dur = len(x) / SR
         words = L["text"].split(); ww = _weights(words)
         cum = np.concatenate([[0], np.cumsum(ww)]) / ww.sum() * (dur - 0.08) + 0.03

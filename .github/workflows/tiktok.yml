@@ -18,6 +18,11 @@ on:
         description: "Send the video to my TikTok inbox as a draft"
         type: boolean
         default: true
+  workflow_call:
+    inputs:
+      premise: { type: string, default: "" }
+      template: { type: string, default: auto }
+      send_to_inbox: { type: boolean, default: true }
   # daily draft:
   # schedule:
   #   - cron: "23 12 * * *"
@@ -25,13 +30,12 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: tiktok-draft
-  cancel-in-progress: false
-
 jobs:
   draft:
     runs-on: ubuntu-24.04
+    concurrency:
+      group: tiktok-draft
+      cancel-in-progress: false
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4

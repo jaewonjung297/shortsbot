@@ -1,4 +1,4 @@
-# shortsbot: narrated Reddit-story videos for TikTok
+# shortsbot: narrated blocky-character videos for TikTok
 
 Paste a Reddit post (r/AmIOverreacting, r/AITA and similar) and get a 65–85 s vertical video (1080×1920, 30 fps).
 Blocky, Roblox-style characters act out the story. A TTS narrator reads it, with big word-by-word captions
@@ -23,6 +23,22 @@ post ──▶ condense ──▶ narrate ──▶ render (parallel parts) ─�
 | assemble | joins the parts, adds piano bed, swooshes, booms and message pings, ducks the music under the voice, normalizes loudness to -14 LUFS | `short.mp4`, `caption.txt`, `script.txt`, `cover.jpg` |
 | deliver | uploads to your TikTok inbox as a draft | `result.json` (publish id) |
 
+## Modes
+
+| mode | input | what you get |
+|---|---|---|
+| `reddit_story` (default) | a pasted Reddit post | the post retold in Claude's own words, 65–85 s |
+| `in_this_town` | a premise, or nothing for fresh ideas | 3–4 deadpan "In this town, everybody… Except me." bits, 65–85 s |
+| `what_if` | a premise, or nothing | the legacy low-poly "What if…?" video (see the end of this file) |
+
+`reddit_story` and `in_this_town` share the same characters, scenes, narration and captions; only Claude's
+prompt differs. `what_if` runs the separate legacy pipeline (`tiktok.yml`) from the same workflow.
+
+Every `reddit_story` and `in_this_town` video opens with **"In this town, everyone goes HUSS HUSS."** and
+uses "HUSS HUSS" at least 3 more times. Reddit stories are retold as if they happen in that town. Claude is
+sent back to fix any script that breaks this (`OPENER`, `HUSS_MIN` and `format_errors` in
+`shortsbot/story/condense.py`). Hand-written specs and `--from-run` specs are not checked.
+
 ## Run it
 
 ### From the terminal (GitHub Actions)
@@ -31,6 +47,10 @@ post ──▶ condense ──▶ narrate ──▶ render (parallel parts) ─�
 pbpaste | scripts/story                    # post from the clipboard
 scripts/story post.txt                     # post from a file
 scripts/story --example story_cat          # skip Claude, render examples/story_cat.json
+scripts/story --mode in_this_town --premise "everyone parties except me"
+scripts/story --mode in_this_town          # Claude invents the premises
+scripts/story --mode what_if --premise "What if the Moon came twice as close?"
+scripts/story --from-run <run id>          # re-render an earlier run's script without calling Claude
 scripts/story --no-inbox --voice am_adam --notes "keep it light" post.txt
 ```
 
@@ -38,7 +58,8 @@ scripts/story --no-inbox --voice am_adam --notes "keep it light" post.txt
 the result into `out/story-<run id>/`. The Actions page shows the same run as a pipeline graph:
 condense → narrate → render (matrix) → assemble → deliver.
 
-You can also start it from **Actions → story → Run workflow**, or with:
+You can also start it from **Actions → story → Run workflow**: pick a **Format**, paste the post or premise into
+the second box, and leave the developer fields empty. Or:
 
 ```bash
 gh workflow run story.yml -f story="$(pbpaste)"
@@ -107,7 +128,7 @@ Claude writes the spec, and you can also write one by hand. The full schema is `
 | emotions | happy, neutral, smug, sad, worried, cold, tired, shocked, angry |
 | poses | idle, hold_pet, cross, point, shrug, yell, facepalm, phone, lying (bed only) |
 | camera | wide, medium, push, closeup:&lt;who&gt; |
-| fx | hearts, sweat, tears, shake, punch, redflash, cold, desat, memory, dark, fluff |
+| fx | hearts, sweat, tears, shake, punch, redflash, cold, desat, memory, dark, fluff, night, party |
 
 ## Content rules
 
@@ -120,7 +141,7 @@ Claude writes the spec, and you can also write one by hand. The full schema is `
 
 ```
 shortsbot/story/
-  condense.py   Claude: post -> spec.json
+  condense.py   Claude: post or premise -> spec.json (one prompt per mode)
   spec.py       spec schema and validator
   narrate.py    Kokoro TTS -> narration.wav + timeline.json
   art.py        drawing kit: blocky characters, faces, pets, rooms
@@ -138,5 +159,5 @@ TERMS.md, PRIVACY.md        linked from the TikTok developer app
 ## Legacy: "What if…?" videos
 
 The earlier pipeline (`shortsbot/` top-level modules, `templates/`, `tiktok.yml`, `daily.yml`,
-`instagram-*.yml`) makes low-poly POV "What if…?" videos and can post to YouTube and Instagram Reels. It
+`instagram-*.yml`) is the `what_if` mode. It makes low-poly POV "What if…?" videos and can post to YouTube and Instagram Reels. It
 still works but is no longer developed. See `python -m shortsbot --help`.

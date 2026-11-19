@@ -139,8 +139,10 @@ def caption_groups(timeline):
     for ln in timeline["lines"]:
         cur = []
         for w in ln["words"]:
+            if cur and len(" ".join(x["w"] for x in cur + [w])) > 14:   # keep each group short enough for full-size text
+                groups.append(cur); cur = []
             cur.append(w)
-            if len(cur) >= 3 or w["w"][-1] in ".?!," or len(" ".join(x["w"] for x in cur)) > 14:
+            if len(cur) >= 3 or w["w"][-1] in ".?!,":
                 groups.append(cur); cur = []
         if cur: groups.append(cur)
     return groups
@@ -205,6 +207,11 @@ class StoryRenderer:
             ctx.set_source_rgba(1.0, 0.85, 0.55, 0.22); ctx.paint()
             g = cairo.RadialGradient(540, 960, 300, 540, 960, 1100); g.add_color_stop_rgba(0, 1, 1, 1, 0); g.add_color_stop_rgba(1, 1, 0.95, 0.85, 0.75)
             ctx.set_source(g); ctx.paint()
+        if "party" in fx:
+            for k, col in enumerate(((1, 0.2, 0.6), (0.2, 0.6, 1), (0.3, 1, 0.4), (1, 0.85, 0.2))):
+                px, py = 540 + 420 * math.sin(t * 1.7 + k * 1.6), 800 + 500 * math.cos(t * 1.3 + k * 2.1)
+                g = cairo.RadialGradient(px, py, 0, px, py, 520); g.add_color_stop_rgba(0, *col, 0.28 * (0.6 + 0.4 * math.sin(t * 8 + k)))
+                g.add_color_stop_rgba(1, *col, 0); ctx.set_source(g); ctx.paint()
         if "redflash" in fx: ctx.set_source_rgba(1, 0.1, 0.05, 0.12 + 0.1 * abs(math.sin(t * 6))); ctx.paint()
         if "dark" in fx:
             g = cairo.RadialGradient(540, 900, 200, 540, 900, 900); g.add_color_stop_rgba(0, 0, 0, 0, 0); g.add_color_stop_rgba(1, 0, 0, 0, 0.75 * ease(u * 2))

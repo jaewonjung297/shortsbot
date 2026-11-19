@@ -19,8 +19,8 @@ def load(d, name): return json.load(open(os.path.join(d, name)))
 
 def stage_condense(a):
     from .condense import condense
-    story = open(a.story).read()
-    spec = condense(story, log=log, notes=a.notes or "")
+    story = open(a.story).read() if a.story else ""
+    spec = condense(story, log=log, notes=a.notes or "", mode=a.mode)
     if a.voice: spec["voice"] = a.voice
     if a.speed: spec["speed"] = a.speed
     os.makedirs(a.dir, exist_ok=True)
@@ -103,7 +103,7 @@ def stage_preview(a):
     out = os.path.join(a.dir, "preview.png"); sheet.save(out); log("preview:", out)
 
 def stage_all(a):
-    if a.story: stage_condense(a)
+    if a.story or a.mode != "reddit_story": stage_condense(a)
     stage_narrate(a)
     parts = a.parts
     procs = [subprocess.Popen([sys.executable, "-m", "shortsbot.story", "render", "--dir", a.dir, "--part", str(k), "--parts", str(parts)])
@@ -115,6 +115,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(prog="shortsbot.story")
     p.add_argument("stage", choices=["condense", "narrate", "render", "assemble", "deliver", "all", "preview"])
     p.add_argument("--dir", default="work")
+    p.add_argument("--mode", default="reddit_story", choices=["reddit_story", "in_this_town"])
     p.add_argument("--story"); p.add_argument("--notes"); p.add_argument("--voice"); p.add_argument("--speed", type=float)
     p.add_argument("--part", type=int, default=0); p.add_argument("--parts", type=int, default=os.cpu_count() or 2)
     a = p.parse_args(argv)

@@ -383,23 +383,35 @@ def scene_window(ctx, t, fx):
     block(ctx, 60, 1180, 960, 70, (0.95, 0.95, 0.95), 0.15)       # sill
 
 def scene_exterior(ctx, t, fx):
+    night = "night" in fx
     g = cairo.LinearGradient(0, -900, 0, 1300)
-    g.add_color_stop_rgb(0, 0.45, 0.65, 0.95); g.add_color_stop_rgb(1, 0.85, 0.92, 1.0)
+    if night: g.add_color_stop_rgb(0, 0.04, 0.05, 0.16); g.add_color_stop_rgb(1, 0.16, 0.18, 0.36)
+    else: g.add_color_stop_rgb(0, 0.45, 0.65, 0.95); g.add_color_stop_rgb(1, 0.85, 0.92, 1.0)
     ctx.rectangle(-900, -900, 2900, 2300); ctx.set_source(g); ctx.fill()
-    for (cx, cy, r) in ((100, 300, 60), (180, 290, 80), (260, 310, 55), (800, 200, 50), (870, 190, 70)):
-        ctx.arc(cx, cy, r, 0, 2 * math.pi); fill(ctx, (1, 1, 1), 0.9)
-    ctx.rectangle(-900, 1350, 2900, 1500); fill(ctx, (0.55, 0.78, 0.45))
-    ctx.rectangle(-900, 1560, 2900, 120); fill(ctx, (0.55, 0.55, 0.58))
+    if night:
+        rnd = random.Random(7)
+        for _ in range(90):
+            sx, sy = rnd.uniform(-600, 1700), rnd.uniform(-700, 900)
+            ctx.arc(sx, sy, rnd.uniform(1.5, 4), 0, 2 * math.pi); fill(ctx, (1, 1, 0.9), 0.5 + 0.5 * abs(math.sin(t * 2 + sx)))
+        ctx.arc(820, 260, 90, 0, 2 * math.pi); fill(ctx, (0.98, 0.96, 0.85))
+    else:
+        for (cx, cy, r) in ((100, 300, 60), (180, 290, 80), (260, 310, 55), (800, 200, 50), (870, 190, 70)):
+            ctx.arc(cx, cy, r, 0, 2 * math.pi); fill(ctx, (1, 1, 1), 0.9)
+    dim = 0.45 if night else 1.0
+    ctx.rectangle(-900, 1350, 2900, 1500); fill(ctx, mul((0.55, 0.78, 0.45), dim))
+    ctx.rectangle(-900, 1560, 2900, 120); fill(ctx, mul((0.55, 0.55, 0.58), dim))
     for i, (hx, col, roof) in enumerate([(-350, (0.95, 0.85, 0.7), (0.65, 0.35, 0.3)), (230, (0.75, 0.82, 0.95), (0.35, 0.4, 0.55)),
                                           (800, (0.98, 0.92, 0.8), (0.55, 0.3, 0.3)), (1350, (0.85, 0.9, 0.75), (0.4, 0.45, 0.35))]):
         w, h = 470, 380
+        col, roof = mul(col, dim), mul(roof, dim)
         block(ctx, hx, 1360 - h, w, h, col, 0.12)
         poly(ctx, [(hx - 40, 1360 - h + 6), (hx + w / 2, 1360 - h - 230), (hx + w + 40, 1360 - h + 6)], roof)
         poly(ctx, [(hx + w + 40, 1360 - h + 6), (hx + w / 2, 1360 - h - 230), (hx + w / 2 + 50, 1360 - h - 260), (hx + w + 90, 1360 - h - 25)], mul(roof, 0.75))
         block(ctx, hx + w * 0.4, 1360 - 180, w * 0.2, 180, mul(roof, 0.9), 0.1)
+        lit = (1, 0.85, 0.45) if night else (1, 0.9, 0.55) if i == 1 else (0.6, 0.8, 0.95)
         for wx in (hx + 50, hx + w - 150):
-            rrect(ctx, wx, 1360 - h + 70, 100, 100, 8); fill(ctx, (1, 0.9, 0.55) if i == 1 else (0.6, 0.8, 0.95))
-        ctx.set_source_rgb(0.3, 0.6, 0.3); ctx.arc(hx - 60, 1330, 60, 0, 2 * math.pi); ctx.fill()
+            rrect(ctx, wx, 1360 - h + 70, 100, 100, 8); fill(ctx, lit)
+        ctx.set_source_rgb(*mul((0.3, 0.6, 0.3), dim)); ctx.arc(hx - 60, 1330, 60, 0, 2 * math.pi); ctx.fill()
 
 SCENES = dict(bedroom=scene_bedroom, bed=scene_bed, desk=scene_desk, living=scene_living, kitchen=scene_kitchen,
               window=scene_window, exterior=scene_exterior)
