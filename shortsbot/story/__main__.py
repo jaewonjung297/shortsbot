@@ -4,6 +4,7 @@
   python -m shortsbot.story narrate   --dir work                        # Kokoro -> narration.wav, timeline.json
   python -m shortsbot.story render    --dir work --part 0 --parts 4     # frames -> part_0.mp4
   python -m shortsbot.story assemble  --dir work                        # join + music + mix -> short.mp4 + package
+  python -m shortsbot.story deliver   --dir work                        # short.mp4 -> TikTok inbox draft
   python -m shortsbot.story all       --story story.txt --dir work      # everything locally
   python -m shortsbot.story preview   --dir work                        # contact sheet of every shot
 """
@@ -80,6 +81,12 @@ def stage_assemble(a):
               open(os.path.join(a.dir, "result.json"), "w"), indent=1)
     log("assemble: %s (%.1fs)" % (final, dur))
 
+def stage_deliver(a):
+    from ..tiktok import send_to_inbox
+    publish_id, status = send_to_inbox(os.path.join(a.dir, "short.mp4"), log=log)
+    res = load(a.dir, "result.json"); res.update(publish_id=publish_id, tiktok_status=status)
+    json.dump(res, open(os.path.join(a.dir, "result.json"), "w"), indent=1)
+
 def stage_preview(a):
     from PIL import Image
     from .render import StoryRenderer
@@ -106,12 +113,12 @@ def stage_all(a):
 
 def main(argv=None):
     p = argparse.ArgumentParser(prog="shortsbot.story")
-    p.add_argument("stage", choices=["condense", "narrate", "render", "assemble", "all", "preview"])
+    p.add_argument("stage", choices=["condense", "narrate", "render", "assemble", "deliver", "all", "preview"])
     p.add_argument("--dir", default="work")
     p.add_argument("--story"); p.add_argument("--notes"); p.add_argument("--voice"); p.add_argument("--speed", type=float)
     p.add_argument("--part", type=int, default=0); p.add_argument("--parts", type=int, default=os.cpu_count() or 2)
     a = p.parse_args(argv)
-    {"condense": stage_condense, "narrate": stage_narrate, "render": stage_render, "assemble": stage_assemble,
+    {"condense": stage_condense, "narrate": stage_narrate, "render": stage_render, "assemble": stage_assemble, "deliver": stage_deliver,
      "all": stage_all, "preview": stage_preview}[a.stage](a)
 
 if __name__ == "__main__":

@@ -1,0 +1,194 @@
+name: story
+
+# Paste a Reddit post -> narrated blocky-character video -> TikTok inbox draft.
+# Start it with the terminal command (scripts/story), from Actions -> story -> Run workflow, or:
+#   gh workflow run story.yml -f story="$(pbpaste)"
+#   gh workflow run story.yml -f example=story_cat -f send_to_inbox=false      # skip Claude, use examples/story_cat.json
+run-name: "story: ${{ inputs.label || inputs.example || 'pasted post' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      story:
+        description: "The Reddit post (title + body)"
+        type: string
+        default: ""
+      example:
+        description: "Or: name of a spec in examples/ (e.g. story_cat), skips Claude"
+        type: string
+        default: ""
+      notes:
+        description: "Optional notes for Claude (tone, what to emphasize)"
+        type: string
+        default: ""
+      voice:
+        description: "Narrator voice"
+        type: choice
+        options: [auto, af_heart, af_bella, am_michael, am_adam]
+        default: auto
+      parts:
+        description: "Parallel render jobs"
+        type: choice
+        options: ["4", "6", "8"]
+        default: "6"
+      send_to_inbox:
+        description: "Send the finished video to my TikTok inbox as a draft"
+        type: boolean
+        default: true
+      label:
+        description: "Short label for the run list (set by the CLI)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  PYTHON: "3.12"
+
+jobs:
+  condense:
+    name: "1 · condense (Claude)"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      parts: ${{ steps.parts.outputs.list }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON }}", cache: pip }
+      - run: pip install anthropic
+      - name: Post -> spec.json
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SHORTSBOT_MODEL: ${{ vars.SHORTSBOT_MODEL || 'claude-sonnet-5-5' }}
+          STORY: ${{ inputs.story }}
+          EXAMPLE: ${{ inputs.example }}
+          NOTES: ${{ inputs.notes }}
+          VOICE: ${{ inputs.voice }}
+        run: |
+          mkdir -p work
+          if [ -n "$EXAMPLE" ]; then
+            cp "examples/${EXAMPLE%.json}.json" work/spec.json
+          else
+            [ -n "$STORY" ] || { echo "::error::paste a story or name an example"; exit 1; }
+            printf '%s\n' "$STORY" > work/story.txt
+            args=(condense --story work/story.txt --dir work)
+            [ -n "$NOTES" ] && args+=(--notes "$NOTES")
+            python -m shortsbot.story "${args[@]}"
+          fi
+          if [ "$VOICE" != "auto" ]; then jq --arg v "$VOICE" '.voice=$v' work/spec.json > work/s && mv work/s work/spec.json; fi
+          python -c "import json,sys; from shortsbot.story.spec import validate; e=validate(json.load(open('work/spec.json'))); sys.exit('\n'.join(e) if e else 0)"
+      - id: parts
+        run: echo "list=$(jq -cn --argjson n ${{ inputs.parts }} '[range($n)]')" >> "$GITHUB_OUTPUT"
+      - name: Summary
+        run: |
+          {
+            echo "## $(jq -r .title work/spec.json)"
+            echo; echo "| # | scene | narration |"; echo "|---|---|---|"
+            jq -r '.lines | to_entries[] | "| \(.key + 1) | \(.value.scene) | \(.value.text) |"' work/spec.json
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with: { name: spec, path: work/spec.json, retention-days: 7 }
+
+  narrate:
+    name: "2 · narrate (Kokoro TTS)"
+    needs: condense
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON }}", cache: pip }
+      - uses: actions/cache@v4
+        with: { path: ~/.cache/kokoro, key: kokoro-v1.0 }
+      - run: pip install numpy kokoro-onnx soundfile
+      - uses: actions/download-artifact@v4
+        with: { name: spec, path: work }
+      - run: python -m shortsbot.story narrate --dir work
+      - uses: actions/upload-artifact@v4
+        with: { name: narration, path: "work/narration.wav\nwork/timeline.json", retention-days: 7 }
+
+  render:
+    name: "3 · render part ${{ matrix.part }}"
+    needs: [condense, narrate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        part: ${{ fromJSON(needs.condense.outputs.parts) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg libcairo2-dev pkg-config fonts-inter
+          fc-cache -f
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON }}", cache: pip }
+      - run: pip install pycairo numpy
+      - uses: actions/download-artifact@v4
+        with: { pattern: "{spec,narration}", path: work, merge-multiple: true }
+      - run: python -m shortsbot.story render --dir work --part ${{ matrix.part }} --parts ${{ inputs.parts }}
+      - uses: actions/upload-artifact@v4
+        with: { name: "part-${{ matrix.part }}", path: work/part_*.mp4, retention-days: 1 }
+
+  assemble:
+    name: "4 · assemble (music + mix)"
+    needs: render
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON }}", cache: pip }
+      - run: pip install numpy scipy soundfile
+      - uses: actions/download-artifact@v4
+        with: { path: work, merge-multiple: true }
+      - run: python -m shortsbot.story assemble --dir work
+      - uses: actions/upload-artifact@v4
+        with:
+          name: story-${{ github.run_id }}
+          path: |
+            work/short.mp4
+            work/caption.txt
+            work/script.txt
+            work/cover.jpg
+            work/spec.json
+            work/result.json
+          retention-days: 7
+      - name: Summary
+        run: |
+          {
+            echo "## Video ready ($(jq -r .duration work/result.json) s)"
+            echo "Download **story-${{ github.run_id }}** from the artifacts below."
+            echo; echo "**Caption**"; echo '```'; cat work/caption.txt; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deliver:
+    name: "5 · deliver (TikTok inbox draft)"
+    needs: assemble
+    if: inputs.send_to_inbox
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON }}", cache: pip }
+      - run: pip install requests
+      - uses: actions/download-artifact@v4
+        with: { name: "story-${{ github.run_id }}", path: work }
+      - name: Upload to TikTok inbox
+        env:
+          TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
+          TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+          TIKTOK_REFRESH_TOKEN: ${{ secrets.TIKTOK_REFRESH_TOKEN }}
+        run: |
+          [ -n "$TIKTOK_REFRESH_TOKEN" ] || { echo "::error::TikTok secrets not set yet (see CLAUDE.md)"; exit 1; }
+          python -m shortsbot.story deliver --dir work
+          echo "Sent to the TikTok inbox. Open the TikTok app to finish the post." >> "$GITHUB_STEP_SUMMARY"

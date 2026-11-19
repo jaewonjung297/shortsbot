@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Paste a Reddit post, start the `story` GitHub Actions workflow, and watch it run.
+
+  scripts/story                      # paste the post, end with Ctrl-D
+  pbpaste | scripts/story            # from the clipboard
+  scripts/story post.txt             # from a file
+  scripts/story --example story_cat  # skip Claude, render examples/story_cat.json
+  scripts/story --no-inbox --notes "keep it light" --voice am_adam post.txt
+
+Needs the GitHub CLI (`gh auth login` once). When the run finishes it downloads the video into out/story-<run id>/.
+"""
+import argparse, calendar, json, os, subprocess, sys, time
+
+WORKFLOW = "story.yml"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def gh(*args, capture=True):
+    r = subprocess.run(["gh", *args], cwd=ROOT, text=True, capture_output=capture)
+    if r.returncode: sys.exit("gh %s failed:\n%s" % (" ".join(args[:3]), (r.stderr or "").strip()))
+    return r.stdout
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("file", nargs="?", help="text file with the post (default: read stdin)")
+    p.add_argument("--example", help="render a spec from examples/ instead of condensing a post")
+    p.add_argument("--notes", default="", help="notes for Claude (tone, emphasis)")
+    p.add_argument("--voice", default="auto", choices=["auto", "af_heart", "af_bella", "am_michael", "am_adam"])
+    p.add_argument("--parts", default="6", choices=["4", "6", "8"])
+    p.add_argument("--no-inbox", action="store_true", help="don't send the result to the TikTok inbox")
+    p.add_argument("--ref", default=None, help="branch to run the workflow from (default: current branch)")
+    a = p.parse_args()
+
+    story = ""
+    if not a.example:
+        if a.file: story = open(a.file).read()
+        else:
+            if sys.stdin.isatty(): print("Paste the post, then press Ctrl-D:\n", file=sys.stderr)
+            story = sys.stdin.read()
+        story = story.strip()
+        if len(story) < 200: sys.exit("That post looks too short (%d chars)." % len(story))
+    label = a.example or (story.splitlines()[0][:60] if story else "post")
+    ref = a.ref or subprocess.run(["git", "branch", "--show-current"], cwd=ROOT, text=True, capture_output=True).stdout.strip() or "main"
+
+    args = ["workflow", "run", WORKFLOW, "--ref", ref, "-f", "label=" + label, "-f", "voice=" + a.voice,
+            "-f", "parts=" + a.parts, "-f", "send_to_inbox=" + ("false" if a.no_inbox else "true")]
+    if a.example: args += ["-f", "example=" + a.example]
+    else: args += ["-f", "story=" + story]
+    if a.notes: args += ["-f", "notes=" + a.notes]
+    started = time.time()
+    gh(*args)
+    print("Started the story workflow on %s; finding the run..." % ref)
+
+    run = None
+    for _ in range(30):
+        runs = json.loads(gh("run", "list", "--workflow", WORKFLOW, "--branch", ref, "--event", "workflow_dispatch",
+                             "--limit", "5", "--json", "databaseId,createdAt,url,displayTitle"))
+        fresh = [r for r in runs if calendar.timegm(time.strptime(r["createdAt"], "%Y-%m-%dT%H:%M:%SZ")) >= started - 30]
+        if fresh: run = fresh[0]; break
+        time.sleep(2)
+    if not run: sys.exit("Couldn't find the run; check the Actions tab.")
+    rid = str(run["databaseId"])
+    print("Run: %s\n    %s\n" % (run["displayTitle"], run["url"]))
+
+    ok = subprocess.run(["gh", "run", "watch", rid, "--interval", "5", "--exit-status"], cwd=ROOT).returncode == 0
+    if not ok:
+        print("\nThe run failed. Failed steps' logs:\n")
+        subprocess.run(["gh", "run", "view", rid, "--log-failed"], cwd=ROOT)
+        sys.exit(1)
+    out = os.path.join(ROOT, "out", "story-" + rid)
+    gh("run", "download", rid, "--name", "story-" + rid, "--dir", out)
+    print("\nDone. Files in %s" % out)
+    for f in ("short.mp4", "caption.txt", "cover.jpg"):
+        if os.path.exists(os.path.join(out, f)): print("  " + f)
+    if sys.platform == "darwin" and os.path.exists(os.path.join(out, "short.mp4")):
+        subprocess.run(["open", "-R", os.path.join(out, "short.mp4")])
+
+if __name__ == "__main__":
+    main()
