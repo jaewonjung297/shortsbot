@@ -35,8 +35,9 @@ post ──▶ condense ──▶ narrate ──▶ render (parallel parts) ─�
 prompt differs. `what_if` runs the separate legacy pipeline (`tiktok.yml`) from the same workflow.
 
 Every `reddit_story` and `in_this_town` video opens with **"In this town, everyone goes HUSS HUSS."** and
-uses "HUSS HUSS" at least 3 more times. Reddit stories are retold as if they happen in that town. Claude is
-sent back to fix any script that breaks this (`OPENER`, `HUSS_MIN` and `format_errors` in
+uses "HUSS HUSS" at least 3 more times. Reddit stories are retold as if they happen in that town: townspeople,
+town places, neighbors and gossip reacting, with the town mentioned in at least 6 lines. Claude is sent back to
+fix any script that breaks this (`OPENER`, `HUSS_MIN`, `TOWN_MIN` and `format_errors` in
 `shortsbot/story/condense.py`). Hand-written specs and `--from-run` specs are not checked.
 
 ## Run it
@@ -161,3 +162,19 @@ TERMS.md, PRIVACY.md        linked from the TikTok developer app
 The earlier pipeline (`shortsbot/` top-level modules, `templates/`, `tiktok.yml`, `daily.yml`,
 `instagram-*.yml`) is the `what_if` mode. It makes low-poly POV "What if…?" videos and can post to YouTube and Instagram Reels. It
 still works but is no longer developed. See `python -m shortsbot --help`.
+
+## 3D renderer (experimental): `blocky/`
+
+`blocky/` is a Remotion + three.js project from the **blocky-shorts** skill (`.claude/skills/blocky-shorts`, MIT):
+real 3D blocky characters, PBR materials, cinematic light and baked physics, timed to a recorded voice-over. It is
+not wired into `scripts/story` yet and renders locally on the Mac's GPU (GitHub runners have none).
+
+```bash
+cd blocky && npm ci                                          # once
+export PYTHON=../.venv/bin/python                            # numpy, Pillow, faster-whisper, av<16
+bash tools/checks.sh                                         # numeric motion + framing checks
+CONC=3 bash render.sh 1 BlockyTestSub 0-89                   # 3 s test -> out/renders/v1.mp4 (+ QA)
+```
+
+Renders are versioned and never overwritten. Workflow, rules and the premium pass: `.claude/skills/blocky-shorts/SKILL.md`.
+Remotion is free for individuals and companies of up to 3 people (Remotion License).

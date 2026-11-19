@@ -21,7 +21,8 @@ local, gitignored `.env` (see `.env.example`); GitHub secrets are write-only and
    (Claude writes 3-4 deadpan "In this town, everybody... Except me." bits from an optional premise; same renderer),
    and `what_if` (legacy "What if…?" pipeline, run via `tiktok.yml` as a reusable workflow; keep working, don't develop).
    **Every condensed video** (both modes) opens with "In this town, everyone goes HUSS HUSS." and has >= 3 more
-   "HUSS HUSS"; Reddit stories are reframed as happening in that town. Enforced in `condense.format_errors`.
+   "HUSS HUSS"; Reddit stories are reframed as happening in that town (townspeople, town places, gossip; "town" in
+   >= 6 lines). Enforced in `condense.format_errors`.
 3. **Human in the loop:** videos go to the TikTok inbox as **drafts** (Upload mode); the user adds their own
    voice/edits and posts from the app. Don't build auto-publishing: platforms demonetize mass-produced,
    unattended AI content, and narrated Reddit stories with TTS are a named risk.
@@ -73,6 +74,13 @@ swallows first words and slurs above ~1.3x. Caption groups are capped at 14 char
 `in_this_town` tested locally (Nov 19 2026): valid spec after JSON repairs, 86 s narration, night/party exterior.
 kokoro-onnx/onnxruntime may lack wheels for brand-new Pythons (3.15); use 3.11/3.12. Characters must stay
 **original** (not Roblox's avatars/branding).
+
+### 3D renderer (experimental, Nov 19 2026)
+`.claude/skills/blocky-shorts` (third-party skill v1.2, MIT; reviewed: no network calls beyond npm/Remotion/Whisper
+downloads) and its Remotion template copied to `blocky/` (+ `blocky/scripts`). `npm ci` done (npm skips esbuild's
+postinstall; works anyway). Use `PYTHON=../.venv/bin/python` (faster-whisper 1.2, av 15). `tools/checks.sh` all ok;
+`render.sh 1 BlockyTestSub 0-89` renders 3 s in ~35 s with CONC=3. Not yet connected to the story pipeline; local
+GPU only.
 
 ## Status of external setup
 - GitHub: `gh` logged in locally (`~/homebrew/bin/gh`). Secrets set: `ANTHROPIC_API_KEY` and the **Sandbox**

@@ -5,6 +5,7 @@ from .spec import SCHEMA, SCENES, LOOKS, SHIRTS, HAIR, EMOTIONS, POSES, FX, WORD
 OPENER = "In this town, everyone goes HUSS HUSS."
 HUSS = "HUSS HUSS"
 HUSS_MIN = 3                   # interjections after the opener
+TOWN_MIN = 6                   # lines that mention the town (reddit_story)
 
 MODEL = os.environ.get("SHORTSBOT_MODEL", "claude-sonnet-5-5")
 
@@ -19,8 +20,13 @@ Privacy and care: change identifying details (names, exact ages, schools, cities
 material (abuse, self-harm, health) brief and non-graphic: one plain line at most, no specifics. No slurs or
 sexual content. If the post is not suitable for a family-friendly video, return {{"refuse": "<reason>"}}.
 
-Retell the story as if it happens in "this town": a small town where everyone goes "HUSS HUSS". Keep the post's
-facts and beats, but frame the people as townspeople and the places as parts of the town.
+Retell the story as if it happens in "this town": a small, nosy town where everyone goes "HUSS HUSS". Keep the
+post's facts and beats, but make the town part of the story:
+- the people are townspeople ("the town baker", "the guy who runs the town's only gym"), and places are town
+  places (the town bakery, Main Street, the town square, the group chat everyone in town is in);
+- the town reacts: neighbors watch from porches, gossip spreads, townspeople pick sides;
+- use the "exterior" scene for town moments and put townspeople in it;
+- say "town" in at least {town_min} lines, spread from start to end.
 
 Structure:
 - Line 2 is a hook that states the conflict in one punchy sentence ("My mom wants to sell my cat. And apparently,
@@ -88,8 +94,8 @@ def _json(text):
 
 def _norm(t): return re.sub(r"[^a-z ]", "", t.lower()).split()
 
-def format_errors(spec):
-    """HUSS HUSS rules: fixed opener, then at least HUSS_MIN more."""
+def format_errors(spec, mode="reddit_story"):
+    """HUSS HUSS rules (fixed opener, at least HUSS_MIN more) and, for Reddit stories, TOWN_MIN town lines."""
     lines = spec.get("lines") or [{}]
     errs = []
     if _norm(lines[0].get("text", "")) != _norm(OPENER):
@@ -97,6 +103,10 @@ def format_errors(spec):
     n = sum(l.get("text", "").upper().count(HUSS) for l in lines[1:])
     if n < HUSS_MIN:
         errs.append("use HUSS HUSS at least %d times after line 1 (have %d)" % (HUSS_MIN, n))
+    if mode == "reddit_story":
+        t = sum(1 for l in lines[1:] if re.search(r"\btown", l.get("text", ""), re.I))
+        if t < TOWN_MIN:
+            errs.append("mention the town in at least %d lines after line 1 (have %d); make the town part of the story" % (TOWN_MIN, t))
     return errs
 
 def condense(story, log=print, max_repairs=4, notes="", mode="reddit_story"):
@@ -105,6 +115,7 @@ def condense(story, log=print, max_repairs=4, notes="", mode="reddit_story"):
                fx=json.dumps(FX), schema=SCHEMA)
     visuals = VISUALS.format(**fmt)
     fmt["huss"] = HUSS_RULES.format(opener=OPENER, n=HUSS_MIN)
+    fmt["town_min"] = TOWN_MIN
     if mode == "in_this_town":
         system = TOWN.format(visuals=visuals, **fmt)
         user = ("Premise: %s" % story.strip()) if story.strip() else "Invent fresh premises."
@@ -120,7 +131,7 @@ def condense(story, log=print, max_repairs=4, notes="", mode="reddit_story"):
         try:
             spec = _json(text)
             if "refuse" in spec: raise SystemExit("Claude declined this post: %s" % spec["refuse"])
-            errs = validate(spec) + format_errors(spec)
+            errs = validate(spec) + format_errors(spec, mode)
         except SystemExit: raise
         except Exception as e:
             spec, errs = None, ["could not parse JSON: %s" % e]

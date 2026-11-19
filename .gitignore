@@ -5,3 +5,7 @@ client_secret*.json
 .env
 .venv/
 work/
+blocky/node_modules/
+blocky/build/
+blocky/out/
+blocky/vo/*.wav
