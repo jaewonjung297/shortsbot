@@ -17,7 +17,7 @@ post ──▶ condense ──▶ narrate ──▶ render (parallel parts) ─�
 
 | stage | what it does | output |
 |---|---|---|
-| condense | Claude rewrites the post in its own words as a shot list (16–28 lines, 185–240 words), changes identifying details, and retries until the spec validates | `spec.json` |
+| condense | Claude rewrites the post in its own words as a shot list (18–34 lines, 300–360 words, read at 1.575× speed), changes identifying details, and retries until the spec validates | `spec.json` |
 | narrate | Kokoro TTS reads each line; per-word timings are estimated for the captions | `narration.wav`, `timeline.json` |
 | render | draws every frame (scenes, characters, camera, fx, captions, end card) in parallel parts | `part_NN.mp4` |
 | assemble | joins the parts, adds piano bed, swooshes, booms and message pings, ducks the music under the voice, normalizes loudness to -14 LUFS | `short.mp4`, `caption.txt`, `script.txt`, `cover.jpg` |

@@ -1,6 +1,16 @@
 """Story spec schema and validator."""
 import re
 
+SPEED = 1.575                  # default narration speed (Kokoro)
+WORDS = (300, 360)             # target narration words at SPEED (about 65-85 s)
+WORDS_OK = (280, 380)          # accepted range at SPEED
+LINES = (18, 34)
+
+def word_range(speed=SPEED, rng=WORDS):
+    """Word range scaled to the narration speed."""
+    k = float(speed) / SPEED
+    return round(rng[0] * k), round(rng[1] * k)
+
 SCENES = {
     "bedroom": "a bedroom with a bed, window and poster",
     "bed": "close view of someone lying in bed under a blanket (use pose 'lying' for the main character)",
@@ -37,7 +47,7 @@ SCHEMA = """
     "me":  {"look": "young_woman", "shirt": "lavender", "hair": "brown"},
     "mom": {"look": "older_woman", "shirt": "red", "hair": "black"}
   },
-  "lines": [                                     // 16-28 narration lines, each one shot
+  "lines": [                                     // 18-34 narration lines, each one shot
     {"text": "My mom wants to sell my cat. And apparently, I'm the dramatic one.",
      "scene": "bedroom",
      "chars": [{"who": "me", "x": 0.3, "emotion": "sad", "pose": "hold_pet"},
@@ -65,10 +75,12 @@ def validate(spec):
     if pet not in (None, *PETS): errs.append("pet must be cat, dog or null")
     if len(spec.get("end_card", "")) > 24: errs.append("end_card max 24 chars")
     lines = spec["lines"]
-    if not (16 <= len(lines) <= 28): errs.append("need 16-28 lines (have %d)" % len(lines))
+    if not (LINES[0] <= len(lines) <= LINES[1]): errs.append("need %d-%d lines (have %d)" % (*LINES, len(lines)))
     words = sum(len(l.get("text", "").split()) for l in lines)
-    if not (170 <= words <= 250):
-        errs.append("narration is %d words; aim for 185-240 words (about 65-85 seconds) so TikTok counts it as over a minute" % words)
+    speed = spec.get("speed", SPEED)
+    lo, hi = word_range(speed, WORDS_OK)
+    if not (lo <= words <= hi):
+        errs.append("narration is %d words; aim for %d-%d words (about 65-85 seconds)" % (words, *word_range(speed)))
     for i, l in enumerate(lines):
         t = l.get("text", "")
         if not t or len(t) > 200: errs.append("line %d: text required, max 200 chars" % i)

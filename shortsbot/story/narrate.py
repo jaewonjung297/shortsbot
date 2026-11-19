@@ -1,6 +1,7 @@
 """Kokoro TTS narration and estimated per-word caption timings."""
 import json, os, re, urllib.request
 import numpy as np
+from .spec import SPEED
 
 SR = 24000
 MODEL_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/"
@@ -15,6 +16,19 @@ def model_dir():
             print("downloading", f)
             urllib.request.urlretrieve(MODEL_URL + f, p + ".part"); os.replace(p + ".part", p)
     return d
+
+# spoken respellings for words the TTS mispronounces; captions keep the original text
+SAY = {
+    "Airbnb": "Air B and B", "Venmo": "Ven mo", "IKEA": "eye kee uh",
+    "AITA": "Am I the A-hole", "AIO": "Am I overreacting", "WIBTA": "Would I be the A-hole",
+    "TIFU": "Today I messed up", "BF": "boyfriend", "GF": "girlfriend", "MIL": "mother-in-law",
+    "FIL": "father-in-law", "SIL": "sister-in-law", "BIL": "brother-in-law", "DM": "D M", "DMs": "D Ms",
+}
+_SAY_RE = re.compile(r"\b(%s)\b" % "|".join(sorted(map(re.escape, SAY), key=len, reverse=True)), re.I)
+_SAY_LOWER = {k.lower(): v for k, v in SAY.items()}
+
+def spoken(text):
+    return _SAY_RE.sub(lambda m: _SAY_LOWER[m.group(1).lower()], text)
 
 def _trim(x, thr=0.012):
     env = np.convolve(np.abs(x), np.ones(240) / 240, mode="same")
@@ -41,11 +55,11 @@ def narrate(spec, outdir, log=print):
     k = Kokoro(os.path.join(d, FILES[0]), os.path.join(d, FILES[1]))
     voice = spec.get("voice", "af_heart")
     if voice not in k.get_voices(): voice = "af_heart"
-    speed = float(spec.get("speed", 1.05))
+    speed = float(spec.get("speed", SPEED))
     audio, lines, t = [np.zeros(int(0.35 * SR))], [], 0.35
     n = len(spec["lines"])
     for i, L in enumerate(spec["lines"]):
-        samples, _ = k.create(L["text"], voice=voice, speed=speed, lang="en-us")
+        samples, _ = k.create(spoken(L["text"]), voice=voice, speed=speed, lang="en-us")
         x = _trim(np.asarray(samples, dtype=np.float32))
         dur = len(x) / SR
         words = L["text"].split(); ww = _weights(words)

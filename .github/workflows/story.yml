@@ -4,7 +4,7 @@ name: story
 # Start it with the terminal command (scripts/story), from Actions -> story -> Run workflow, or:
 #   gh workflow run story.yml -f story="$(pbpaste)"
 #   gh workflow run story.yml -f example=story_cat -f send_to_inbox=false      # skip Claude, use examples/story_cat.json
-run-name: "story: ${{ inputs.label || inputs.example || 'pasted post' }}"
+run-name: "story: ${{ inputs.label || inputs.example || inputs.from_run || 'pasted post' }}"
 
 on:
   workflow_dispatch:
@@ -15,6 +15,10 @@ on:
         default: ""
       example:
         description: "Or: name of a spec in examples/ (e.g. story_cat), skips Claude"
+        type: string
+        default: ""
+      from_run:
+        description: "Or: id of an earlier story run whose spec to reuse, skips Claude"
         type: string
         default: ""
       notes:
@@ -50,6 +54,9 @@ jobs:
   condense:
     name: "1 · condense (Claude)"
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
     timeout-minutes: 10
     outputs:
       parts: ${{ steps.parts.outputs.list }}
@@ -58,6 +65,10 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "${{ env.PYTHON }}", cache: pip }
       - run: pip install anthropic
+      - name: Spec from an earlier run
+        if: inputs.from_run != ''
+        uses: actions/download-artifact@v4
+        with: { name: spec, path: work, run-id: "${{ inputs.from_run }}", github-token: "${{ github.token }}" }
       - name: Post -> spec.json
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -68,7 +79,9 @@ jobs:
           VOICE: ${{ inputs.voice }}
         run: |
           mkdir -p work
-          if [ -n "$EXAMPLE" ]; then
+          if [ -f work/spec.json ]; then
+            echo "using spec from run ${{ inputs.from_run }}"
+          elif [ -n "$EXAMPLE" ]; then
             cp "examples/${EXAMPLE%.json}.json" work/spec.json
           else
             [ -n "$STORY" ] || { echo "::error::paste a story or name an example"; exit 1; }
@@ -120,11 +133,8 @@ jobs:
         part: ${{ fromJSON(needs.condense.outputs.parts) }}
     steps:
       - uses: actions/checkout@v4
-      - name: System packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg libcairo2-dev pkg-config fonts-inter
-          fc-cache -f
+      - uses: ./.github/actions/system-packages
+        with: { packages: "ffmpeg libcairo2-dev pkg-config fonts-inter", key: render }
       - uses: actions/setup-python@v5
         with: { python-version: "${{ env.PYTHON }}", cache: pip }
       - run: pip install pycairo numpy
@@ -141,10 +151,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: System packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg
+      - uses: ./.github/actions/system-packages
+        with: { packages: ffmpeg, key: assemble }
       - uses: actions/setup-python@v5
         with: { python-version: "${{ env.PYTHON }}", cache: pip }
       - run: pip install numpy scipy soundfile

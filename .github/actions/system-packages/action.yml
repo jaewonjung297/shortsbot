@@ -1,0 +1,43 @@
+name: system-packages
+description: Install apt packages from a cache of .deb files, falling back to other Ubuntu mirrors.
+inputs:
+  packages:
+    description: Space-separated apt packages
+    required: true
+  key:
+    description: Cache key suffix (change it when the package list changes)
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      id: cache
+      with:
+        path: ~/apt-debs
+        key: apt-${{ runner.os }}-${{ inputs.key }}-v1
+    - name: Download packages
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p ~/apt-debs/partial
+        codename=$(. /etc/os-release; echo "$VERSION_CODENAME")
+        opts=(-o Acquire::Retries=3 -o Acquire::http::Timeout=20)
+        for m in default http://archive.ubuntu.com/ubuntu http://mirrors.edge.kernel.org/ubuntu; do
+          if [ "$m" != default ]; then
+            echo "apt: trying mirror $m"
+            printf 'Types: deb\nURIs: %s\nSuites: %s %s-updates %s-security\nComponents: main universe\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' \
+              "$m" "$codename" "$codename" "$codename" | sudo tee /etc/apt/sources.list.d/fallback.sources >/dev/null
+          fi
+          sudo apt-get update "${opts[@]}" || true
+          if sudo apt-get install -y --no-install-recommends --download-only "${opts[@]}" \
+               -o Dir::Cache::archives="$HOME/apt-debs" ${{ inputs.packages }}; then ok=1; break; fi
+        done
+        [ -n "${ok:-}" ] || { echo "::error::could not download ${{ inputs.packages }} from any mirror"; exit 1; }
+        sudo rm -rf ~/apt-debs/partial ~/apt-debs/lock; sudo chown -R "$USER" ~/apt-debs
+    - name: Install packages
+      shell: bash
+      run: |
+        shopt -s nullglob; debs=(~/apt-debs/*.deb)
+        if [ ${#debs[@]} -gt 0 ]; then sudo dpkg -i "${debs[@]}"; fi
+        for p in ${{ inputs.packages }}; do dpkg -s "$p" >/dev/null 2>&1 || { echo "::error::$p not installed"; exit 1; }; done
+        fc-cache -f >/dev/null

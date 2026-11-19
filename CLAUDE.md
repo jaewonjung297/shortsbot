@@ -23,7 +23,7 @@ local, gitignored `.env` (see `.env.example`); GitHub secrets are write-only and
    unattended AI content, and narrated Reddit stories with TTS are a named risk.
 4. **Paste a story and watch the pipeline run:** `scripts/story` (uses `gh`) triggers the multi-job
    `story.yml` workflow (condense → narrate → render (matrix) → assemble → deliver) and shows live job status;
-   the Actions page shows the pipeline graph. Written and linted, not yet run on GitHub.
+   the Actions page shows the pipeline graph. Works end to end on GitHub (run 44472305496).
 
 ## Layout
 ```
@@ -43,12 +43,12 @@ examples/                                        hand-written specs (blackout_ca
 TERMS.md, PRIVACY.md                             linked from the TikTok developer app
 ```
 
-### Reddit-story pipeline: branch `reddit-story-wip` (tested locally end to end, Nov 19 2026)
+### Reddit-story pipeline (merged to `main`, working end to end on GitHub, Nov 19 2026)
 ```
 shortsbot/story/
   art.py        drawing kit: toy-like blocks, faces (happy/sad/angry/shocked/...), people, cat, white dog, rooms
   spec.py       story spec schema + validator (cast looks, scenes incl. 'phone' text-message scene, poses, fx)
-  condense.py   Claude: pasted post -> spec (paraphrase, privacy, 185-240 words, 16-28 lines) with repair loop
+  condense.py   Claude: pasted post -> spec (paraphrase, privacy, 300-360 words, 18-34 lines; narration speed 1.575) with repair loop
   narrate.py    Kokoro TTS (kokoro-onnx; model files auto-download from GitHub releases into ~/.cache/kokoro)
                 -> narration.wav + timeline.json with estimated per-word timings
   render.py     spec + timeline -> frames; camera presets (wide/medium/push/closeup:<who>); captions; end card
@@ -62,20 +62,21 @@ scripts/story                terminal CLI: paste a post (or --example story_cat)
 Verified locally (macOS, Python 3.11 venv in `.venv`, brew ffmpeg): narrate -> preview -> all on `story_cat.json`
 gives a 76.7 s 1080x1920 video at -14.3 LUFS in ~55 s with 6 render processes. Fixed: close-ups now frame head and
 shoulders so the caption no longer covers the eyes.
-Not yet verified: `condense` against the live Claude API, `story.yml` on GitHub (needs the branch pushed; try
-`scripts/story --example story_cat --no-inbox` first), and `deliver` (needs the TikTok secrets).
+Not yet verified: `condense` against the live Claude API (first run with a real pasted post).
+Known issue: render jobs sometimes spend 10-25 min in `apt-get install` (slow Ubuntu mirror); caching the apt
+packages would fix it.
 kokoro-onnx/onnxruntime may lack wheels for brand-new Pythons (3.15); use 3.11/3.12. Characters must stay
 **original** (not Roblox's avatars/branding).
 
 ## Status of external setup
-- GitHub: `gh` logged in locally. Secrets set: `ANTHROPIC_API_KEY`, `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`.
-  `TIKTOK_REFRESH_TOKEN` was obtained via `get_tiktok_token.py` on Nov 19 2026 but not yet confirmed as a secret.
-- Branch `reddit-story-wip` is not pushed; `story.yml` must reach `main` before it can be dispatched.
+- GitHub: `gh` logged in locally (`~/homebrew/bin/gh`). Secrets set: `ANTHROPIC_API_KEY` and the **Sandbox**
+  `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `TIKTOK_REFRESH_TOKEN` (all three must come from the same app;
+  mismatched key/secret gives `invalid_client`). The same values are in `.env`.
 - TikTok: developer app "shortsbot" created; **Sandbox** configured (Login Kit + Content Posting API, scopes
   `user.info.basic` + `video.upload`, Desktop redirect `http://localhost:8723/callback/`, Direct Post off).
-  OAuth works (refresh token obtained). Unverified: whether sandbox allows inbox uploads without app review.
-- Live runs so far: "What if" `tiktok-draft` run 44470883670 (Nov 19 2026) wrote and rendered a video via the
-  Claude API, then failed at the inbox upload because `TIKTOK_REFRESH_TOKEN` wasn't a secret yet.
+  Sandbox inbox uploads work without app review: story run 44472305496 (Nov 19 2026, `story_cat` example) delivered
+  a 76.5 s draft with status `SEND_TO_USER_INBOX`.
+- "What if" `tiktok-draft` run 44470883670 rendered via the live Claude API but failed at upload (secrets not set then).
 
 ## Conventions and gotchas
 - Code comments: short and descriptive only; no rationale, design history or conversation notes.

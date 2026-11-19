@@ -5,6 +5,7 @@
   pbpaste | scripts/story            # from the clipboard
   scripts/story post.txt             # from a file
   scripts/story --example story_cat  # skip Claude, render examples/story_cat.json
+  scripts/story --from-run 123456789 # skip Claude, re-render the spec from an earlier run
   scripts/story --no-inbox --notes "keep it light" --voice am_adam post.txt
 
 Needs the GitHub CLI (`gh auth login` once). When the run finishes it downloads the video into out/story-<run id>/.
@@ -23,6 +24,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("file", nargs="?", help="text file with the post (default: read stdin)")
     p.add_argument("--example", help="render a spec from examples/ instead of condensing a post")
+    p.add_argument("--from-run", help="reuse the spec from an earlier story run instead of condensing a post")
     p.add_argument("--notes", default="", help="notes for Claude (tone, emphasis)")
     p.add_argument("--voice", default="auto", choices=["auto", "af_heart", "af_bella", "am_michael", "am_adam"])
     p.add_argument("--parts", default="6", choices=["4", "6", "8"])
@@ -31,19 +33,20 @@ def main():
     a = p.parse_args()
 
     story = ""
-    if not a.example:
+    if not (a.example or a.from_run):
         if a.file: story = open(a.file).read()
         else:
             if sys.stdin.isatty(): print("Paste the post, then press Ctrl-D:\n", file=sys.stderr)
             story = sys.stdin.read()
         story = story.strip()
         if len(story) < 200: sys.exit("That post looks too short (%d chars)." % len(story))
-    label = a.example or (story.splitlines()[0][:60] if story else "post")
+    label = a.example or (("rerender " + a.from_run) if a.from_run else None) or (story.splitlines()[0][:60] if story else "post")
     ref = a.ref or subprocess.run(["git", "branch", "--show-current"], cwd=ROOT, text=True, capture_output=True).stdout.strip() or "main"
 
     args = ["workflow", "run", WORKFLOW, "--ref", ref, "-f", "label=" + label, "-f", "voice=" + a.voice,
             "-f", "parts=" + a.parts, "-f", "send_to_inbox=" + ("false" if a.no_inbox else "true")]
     if a.example: args += ["-f", "example=" + a.example]
+    elif a.from_run: args += ["-f", "from_run=" + a.from_run]
     else: args += ["-f", "story=" + story]
     if a.notes: args += ["-f", "notes=" + a.notes]
     started = time.time()
@@ -71,6 +74,13 @@ def main():
     print("\nDone. Files in %s" % out)
     for f in ("short.mp4", "caption.txt", "cover.jpg"):
         if os.path.exists(os.path.join(out, f)): print("  " + f)
+    cap = os.path.join(out, "caption.txt")
+    if os.path.exists(cap):
+        text = open(cap).read().strip()
+        print("\nCaption:\n  " + text)
+        if sys.platform == "darwin":
+            subprocess.run(["pbcopy"], input=text, text=True)
+            print("  (copied to the clipboard)")
     if sys.platform == "darwin" and os.path.exists(os.path.join(out, "short.mp4")):
         subprocess.run(["open", "-R", os.path.join(out, "short.mp4")])
 
