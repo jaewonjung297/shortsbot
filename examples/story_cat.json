@@ -1,0 +1,418 @@
+{
+ "title": "AIO for being 'dramatic' because my mom wants to sell my cat",
+ "tiktok_caption": "She promised I could keep my cat after uni. Now she's selling her. Am I overreacting? 👇 #aio #amioverreacting #storytime #cats",
+ "voice": "af_heart",
+ "speed": 1.05,
+ "end_card": "AM I OVERREACTING?",
+ "pet": "cat",
+ "cast": {
+  "me": {
+   "look": "young_woman",
+   "shirt": "lavender",
+   "hair": "brown"
+  },
+  "mom": {
+   "look": "older_woman",
+   "shirt": "red",
+   "hair": "black"
+  }
+ },
+ "lines": [
+  {
+   "text": "My mom wants to sell my cat. And apparently, I'm the dramatic one.",
+   "scene": "bedroom",
+   "chars": [
+    {
+     "who": "me",
+     "x": 0.29,
+     "emotion": "sad",
+     "pose": "hold_pet"
+    },
+    {
+     "who": "mom",
+     "x": 0.82,
+     "emotion": "angry",
+     "pose": "point"
+    }
+   ],
+   "cam": "wide",
+   "fx": [
+    "punch"
+   ]
+  },
+  {
+   "text": "I'm twenty, and I've raised her since she was a tiny kitten.",
+   "scene": "bedroom",
+   "chars": [
+    {
+     "who": "me",
+     "x": 0.5,
+     "emotion": "happy",
+     "pose": "hold_pet"
+    }
+   ],
+   "cam": "medium",
+   "fx": [
+    "hearts"
+   ]
+  },
+  {
+   "text": "Four years later, she's the only thing at home that actually makes me happy.",
+   "scene": "bed",
+   "chars": [
+    {
+     "who": "me",
+     "x": 0.5,
+     "emotion": "happy",
+     "pose": "lying"
+    },
+    {
+     "who": "cat",
+     "x": 0.7
+    }
+   ],
+   "cam": "medium",
+   "fx": [
+    "hearts"
+   ]
+  },
+  {
+   "text": "I'm a full time engineering student, and I still live with my parents.",
+   "scene": "exterior",
+   "chars": [],
+   "cam": "wide",
+   "fx": []
+  },
+  {
+   "text": "Between exams and labs, I barely have time to breathe.",
+   "scene": "desk",
+   "chars": [
+    {
+     "who": "me",
+     "x": 0.5,
+     "emotion": "tired",
+     "pose": "idle"
+    }
+   ],
+   "cam": "medium",
+   "fx": [
+    "sweat"
+   ]
+  },
+  {
+   "text": "Coming home to her is honestly what keeps me sane.",
+   "scene": "bedroom",
+   "chars": [
+    {
+     "who": "me",
+     "x": 0.5,
+     "emotion": "happy",
+     "pose": "hold_pet"
+    }
+   ],
+   "cam": "medium",
+   "fx": [
+    "hearts"
+   ]
+  },
+  {
+   "text": "My parents don't really raise animals. They breed them, and I always end up doing the training.",
+   "scene": "living",
+   "chars": [
+    {
+     "who": "mom",
+     "x": 0.19,
+     "emotion": "neutral",
+     "pose": "phone"
+    },
+    {
+     "who": "me",
+     "x": 0.78,
+     "emotion": "worried",
+     "pose": "idle"
+    }
+   ],
+   "cam": "wide",
+   "fx": []
+  },
+  {
+   "text": "So when my mom said cats were too much work,",
+   "scene": "living",
+   "chars": [
+    {
+     "who": "mom",
+     "x": 0.5,
+     "emotion": "neutral",
+     "pose": "cross"
+    }
+   ],
+   "cam": "medium",
+   "fx": []
+  },
+  {
+   "text": "and then brought home two poodles,",
+   "scene": "living",
+   "chars": [
+    {
+     "who": "mom",
+     "x": 0.19,
+     "emotion": "happy",
+     "pose": "idle"
+    },
+    {
+     "who": "dog",
+     "x": 0.58,
+     "pose": "idle"
+    },
+    {
+     "who": "dog",
+     "x": 0.88,
+     "pose": "idle"
+    }
+   ],
+   "cam": "wide",
+   "fx": [
+    "punch"
+   ]
+  },
+  {
+   "text": "I told her before she even got them. I am not raising dogs.",
+   "scene": "living",
+   "chars": [
+    {
+     "who": "me",
+     "x": 0.5,
+     "emotion": "angry",
+     "pose": "cross"
+    }
+   ],
+   "cam": "medium",
+   "fx": []
+  },
+  {
+   "text": "Now they're completely out of control.",
+   "scene": "living",
+   "chars": [
+    {
+     "who": "me",
+     "x": 0.14,
+     "emotion": "worried",
+     "pose": "facepalm"
+    },
+    {
+     "who": "dog",
+     "x": 0.58,
+     "pose": "crazy"
+    },
+    {
+     "who": "dog",
+     "x": 0.91,
+     "pose": "crazy"
+    }
+   ],
+   "cam": "wide",
+   "fx": [
+    "fluff"
+   ]
+  },
+  {
+   "text": "Then she dropped it.",
+   "scene": "kitchen",
+   "chars": [
+    {
+     "who": "mom",
+     "x": 0.5,
+     "emotion": "neutral",
+     "pose": "idle"
+    }
+   ],
+   "cam": "closeup:mom",
+   "fx": [
+    "dark"
+   ]
+  },
+  {
+   "text": "She's selling my cat.",
+   "scene": "kitchen",
+   "chars": [
+    {
+     "who": "me",
+     "x": 0.5,
+     "emotion": "shocked",
+     "pose": "idle"
+    }
+   ],
+   "cam": "closeup:me",
+   "fx": [
+    "shake",
+    "punch"
+   ]
+  },
+  {
+   "text": "She even texted me about it, like it was nothing.",
+   "scene": "phone",
+   "contact": "Mom",
+   "messages": [
+    {
+     "from": "them",
+     "text": "Someone's coming to see the cat on Saturday."
+    },
+    {
+     "from": "me",
+     "text": "You PROMISED I could keep her!"
+    },
+    {
+     "from": "them",
+     "text": "Stop being dramatic."
+    }
+   ]
+  },
+  {
+   "text": "Technically, the cat is hers, because I was a minor when she was born.",
+   "scene": "kitchen",
+   "chars": [
+    {
+     "who": "mom",
+     "x": 0.23,
+     "emotion": "smug",
+     "pose": "hold_pet"
+    },
+    {
+     "who": "me",
+     "x": 0.81,
+     "emotion": "worried",
+     "pose": "idle"
+    }
+   ],
+   "cam": "wide",
+   "fx": []
+  },
+  {
+   "text": "She promised I could take her when I finish uni.",
+   "scene": "bedroom",
+   "chars": [
+    {
+     "who": "mom",
+     "x": 0.27,
+     "emotion": "happy",
+     "pose": "idle"
+    },
+    {
+     "who": "me",
+     "x": 0.76,
+     "emotion": "happy",
+     "pose": "hold_pet"
+    }
+   ],
+   "cam": "wide",
+   "fx": [
+    "memory"
+   ]
+  },
+  {
+   "text": "Now she says by then, the cat will be too old.",
+   "scene": "kitchen",
+   "chars": [
+    {
+     "who": "mom",
+     "x": 0.23,
+     "emotion": "neutral",
+     "pose": "shrug"
+    },
+    {
+     "who": "me",
+     "x": 0.81,
+     "emotion": "sad",
+     "pose": "idle"
+    }
+   ],
+   "cam": "wide",
+   "fx": []
+  },
+  {
+   "text": "For weeks I've barely functioned. I'm cold all the time, and I'm falling behind on everything.",
+   "scene": "bed",
+   "chars": [
+    {
+     "who": "me",
+     "x": 0.5,
+     "emotion": "cold",
+     "pose": "lying"
+    }
+   ],
+   "cam": "medium",
+   "fx": [
+    "cold"
+   ]
+  },
+  {
+   "text": "I told her how much this cat means to me.",
+   "scene": "kitchen",
+   "chars": [
+    {
+     "who": "me",
+     "x": 0.23,
+     "emotion": "sad",
+     "pose": "idle"
+    },
+    {
+     "who": "mom",
+     "x": 0.81,
+     "emotion": "neutral",
+     "pose": "cross"
+    }
+   ],
+   "cam": "wide",
+   "fx": [
+    "tears"
+   ]
+  },
+  {
+   "text": "She screamed that I'm being dramatic, and I can just get another cat when I move out.",
+   "scene": "kitchen",
+   "chars": [
+    {
+     "who": "mom",
+     "x": 0.5,
+     "emotion": "angry",
+     "pose": "yell"
+    }
+   ],
+   "cam": "medium",
+   "fx": [
+    "shake",
+    "redflash"
+   ]
+  },
+  {
+   "text": "And honestly? It brought back a lot of childhood memories I'd rather forget.",
+   "scene": "window",
+   "chars": [
+    {
+     "who": "me",
+     "x": 0.5,
+     "emotion": "sad",
+     "pose": "hold_pet"
+    }
+   ],
+   "cam": "medium",
+   "fx": [
+    "desat"
+   ]
+  },
+  {
+   "text": "So, am I overreacting? Tell me in the comments.",
+   "scene": "bedroom",
+   "chars": [
+    {
+     "who": "me",
+     "x": 0.5,
+     "emotion": "worried",
+     "pose": "hold_pet"
+    }
+   ],
+   "cam": "medium",
+   "fx": []
+  }
+ ]
+}
