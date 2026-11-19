@@ -40,28 +40,6 @@ Structure:
 
 {visuals}"""
 
-TOWN = """You write "In this town" comedy shorts: 65-80 second vertical videos where a deadpan first-person narrator
-describes an absurd town while simple blocky 3D characters act it out, with big word-by-word captions.
-
-The running format is "In this town, everybody <does something absurd>. Except me." Write 3-4 bits. Each bit:
-- opens with "In this town, everybody ..." (or a close variation),
-- escalates the absurdity in 2-6 short lines shown as scenes,
-- lands on a deadpan twist built on "Except me." (the narrator is the odd one out, or turns out to be the weirdest of all).
-Bits can share a theme and the last bit should be the biggest. Keep it dry, quick and family-friendly.
-
-Write ORIGINAL jokes. Never reuse bits, catchphrases or characters from existing creators' videos.
-If the user gives a premise, build the first bit (or the whole video) around it; otherwise invent fresh premises.
-- One idea per line (4-12 words per line works best). The narrator is "me".
-- The last line is a short call to action ("Follow if your town is weird too.").
-- {w0}-{w1} words total, {l0}-{l1} lines.
-- title: the first bit's "In this town, everybody ..." line (<= 70 chars). end_card: "EXCEPT ME." or a short twist.
-- tiktok_caption: the title + a question for comments + 3-5 hashtags (#inthistown #animation #comedy ...).
-- Set "mode": "in_this_town".
-
-{huss}
-
-{visuals}"""
-
 HUSS_RULES = """HUSS HUSS (required in every video):
 - Line 1 is exactly: {opener}
 - Add "HUSS HUSS" at least {n} more times, spread through the story at random-feeling moments: a townsperson
@@ -116,12 +94,9 @@ def condense(story, log=print, max_repairs=4, notes="", mode="reddit_story"):
     visuals = VISUALS.format(**fmt)
     fmt["huss"] = HUSS_RULES.format(opener=OPENER, n=HUSS_MIN)
     fmt["town_min"] = TOWN_MIN
-    if mode == "in_this_town":
-        system = TOWN.format(visuals=visuals, **fmt)
-        user = ("Premise: %s" % story.strip()) if story.strip() else "Invent fresh premises."
-    else:
-        system = SYSTEM.format(visuals=visuals, **fmt)
-        user = "Here is the post:\n\n<post>\n%s\n</post>" % story.strip()
+    if mode != "reddit_story": raise ValueError("condense() writes Reddit stories; in_this_town goes through town.py")
+    system = SYSTEM.format(visuals=visuals, **fmt)
+    user = "Here is the post:\n\n<post>\n%s\n</post>" % story.strip()
     if notes: user += "\n\nCreator notes: %s" % notes
     messages = [{"role": "user", "content": user}]
     client = _client()

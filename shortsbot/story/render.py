@@ -13,12 +13,55 @@ def looks_from_cast(cast):
         look = c["look"]
         shirt = SHIRTS[c.get("shirt", "blue")]
         hair = HAIR[c.get("hair", "gray" if look == "older_man" else "brown")]
-        out[who] = dict(shirt=shirt, hair=hair, pants=(0.25, 0.35, 0.6) if look.startswith("young") else (0.25, 0.25, 0.3),
-                        shoes=(0.95, 0.95, 0.95) if look.startswith("young") else (0.15, 0.15, 0.16),
-                        long=(look == "young_woman"), style="bun" if look == "older_woman" else "short")
+        young = look.startswith(("young", "kid"))
+        out[who] = dict(shirt=shirt, hair=hair, pants=(0.25, 0.35, 0.6) if young else (0.25, 0.25, 0.3),
+                        shoes=(0.95, 0.95, 0.95) if young else (0.15, 0.15, 0.16),
+                        long=look in ("young_woman", "kid_girl"), style="bun" if look == "older_woman" else "short",
+                        scale=KID if look.startswith("kid") else 1.0)
     return out
 
+KID = 0.72
+AURA = {"gold": (1.0, 0.82, 0.25), "blue": (0.35, 0.65, 1.0), "green": (0.4, 0.95, 0.5), "red": (1.0, 0.3, 0.3),
+        "purple": (0.75, 0.45, 1.0), "white": (1.0, 1.0, 1.0)}
+
 def char_x(c): return 150 + 780 * float(c.get("x", 0.5))
+
+def char_scale(looks, c):
+    base = looks[c["who"]]["scale"] if c.get("who") in looks else 1.0
+    return base * float(c.get("scale", 1.0))
+
+def draw_aura(ctx, x, floor, s, col, t):
+    cy = floor - s * 1.6
+    for k in range(3):
+        r = s * (1.5 + 0.25 * k) * (1 + 0.04 * math.sin(t * 3 + k))
+        g = cairo.RadialGradient(x, cy, s * 0.3, x, cy, r)
+        g.add_color_stop_rgba(0, *col, 0.55 - 0.12 * k); g.add_color_stop_rgba(1, *col, 0)
+        ctx.arc(x, cy, r, 0, 2 * math.pi); ctx.set_source(g); ctx.fill()
+
+def draw_sign(ctx, text, sc, x=860, t=0):
+    """In-world sign: a wooden signpost outdoors, a banner on the wall indoors."""
+    ctx.select_font_face("Inter", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD); ctx.set_font_size(46)
+    lines = wrap(ctx, text.upper(), 420)[:3]
+    w = max(ctx.text_extents(l).x_advance for l in lines) + 70; h = 62 * len(lines) + 46
+    outdoor = sc == "exterior"
+    top = (530 - h) if outdoor else 330             # above head height, floating characters included
+    x = min(max(x, w / 2 + 50), 1030 - w / 2)
+    if outdoor:
+        for px in (x - w * 0.3, x + w * 0.3): block(ctx, px - 14, top + h - 10, 28, FLOOR - top - h + 10, (0.45, 0.3, 0.18), 0.1)
+        block(ctx, x - w / 2, top, w, h, (0.82, 0.62, 0.38), 0.08)
+        ink = (0.25, 0.15, 0.08)
+    else:
+        sway = math.sin(t * 1.2) * 0.01
+        ctx.save(); ctx.translate(x, top); ctx.rotate(sway); ctx.translate(-x, -top)
+        block(ctx, x - w / 2, top, w, h, (0.98, 0.95, 0.85), 0.06)
+        for k in range(int(w // 60) + 1):
+            poly(ctx, [(x - w / 2 + k * 60, top + h), (x - w / 2 + k * 60 + 30, top + h + 26), (x - w / 2 + k * 60 + 60, top + h)],
+                 (0.9, 0.35, 0.35) if k % 2 else (0.35, 0.55, 0.9))
+        ink = (0.15, 0.15, 0.2)
+    for j, l in enumerate(lines):
+        te = ctx.text_extents(l); ctx.move_to(x - te.x_advance / 2, top + 72 + j * 62)
+        ctx.set_source_rgb(*ink); ctx.show_text(l)
+    if not outdoor: ctx.restore()
 
 # ------------------------------------------------------------------ phone chat scene
 def scene_phone(ctx, t, u, line):
@@ -91,6 +134,9 @@ def draw_shot(ctx, spec, looks, line, t, u):
         if "tears" in fx: tear(ctx, hx + hs * 0.28, hy + hs * 0.55, hs, t)
         return
     desk = sc == "desk"
+    if line.get("sign"):
+        xs = [char_x(c) for c in chars]
+        draw_sign(ctx, line["sign"], sc, max((230, 540, 850), key=lambda sx: min((abs(sx - x) for x in xs), default=999)), t)
     for j, c in enumerate(chars):
         who = c["who"]; x = char_x(c)
         if who in ("cat", "dog"):
@@ -100,11 +146,17 @@ def draw_shot(ctx, spec, looks, line, t, u):
                 yy = FLOOR - (abs(math.sin(t * 7 + j)) * 120 if crazy else 0)
                 draw_cat(ctx, x, yy, 170, t, "open" if crazy else "happy")
             continue
-        look = looks[who]
+        look = dict(looks[who])
+        if c.get("hair") in HAIR: look["hair"] = HAIR[c["hair"]]
         pose = c.get("pose", "idle")
         floor_y = FLOOR + 40 if (desk and j == 0) else FLOOR
         if desk and j == 0: x -= 60
-        hx, hy, hs = draw_person(ctx, x, floor_y, S, look, c.get("emotion", "neutral"), "hug" if pose == "hold_pet" else pose, t,
+        cs = S * char_scale(looks, c)
+        if c.get("aura") in AURA: draw_aura(ctx, x, floor_y, cs, AURA[c["aura"]], t)
+        if c.get("float"):
+            shadow(ctx, x, floor_y, cs * 0.6, cs * 0.1, 0.18)
+            floor_y -= cs * 0.9 + math.sin(t * 2.2 + j) * cs * 0.06
+        hx, hy, hs = draw_person(ctx, x, floor_y, cs, look, c.get("emotion", "neutral"), "hug" if pose == "hold_pet" else pose, t,
                                  seed=j * 1.7, holding_cat=False, shiver=1.0 if "cold" in fx else 0, pet=pet or "cat")
         if j == 0 and "tears" in fx:
             tear(ctx, hx + hs * 0.28, hy + hs * 0.55, hs, t); tear(ctx, hx + hs * 0.72, hy + hs * 0.55, hs, t + 0.5)
@@ -115,7 +167,7 @@ def draw_shot(ctx, spec, looks, line, t, u):
             ph = (t * 0.35 + k * 0.2) % 1
             heart(ctx, 540 + math.sin(k * 2.1 + t) * 260, 900 - ph * 600, 34 + 10 * math.sin(k), (1, 0.4, 0.55), 1 - ph)
 
-def camera(line, u):
+def camera(line, u, looks=None):
     """Camera presets -> (x, y, zoom)."""
     sc = line["scene"]; cam = line.get("cam", "wide"); chars = line.get("chars", [])
     e = ease(u)
@@ -127,7 +179,9 @@ def camera(line, u):
         who = cam.split(":")[1] if ":" in cam else (chars[0]["who"] if chars else "me")
         c = next((c for c in chars if c["who"] == who), chars[0] if chars else {"x": 0.5})
         x = char_x(c)
-        a, b = (x, 1100, 2.4), (x, 1090, 2.7)   # head and shoulders
+        k = char_scale(looks or {}, c) if c.get("who") not in ("cat", "dog") else KID
+        dy = (1 - k) * 552; z = 1 / max(k, 0.88)
+        a, b = (x, 1100 + dy, 2.4 * z), (x, 1090 + dy, 2.7 * z)   # head and shoulders
     elif cam == "medium": a, b = (540, 1050, 1.35), (540, 1020, 1.5)
     elif cam == "push": a, b = (540, 1150, 1.0), (540, 1000, 1.45)
     else: a, b = (560, 1150, 1.0), (560, 1150, 1.08)
@@ -152,7 +206,7 @@ def draw_caption(ctx, groups, t, y=1230):
     for g in groups:
         if g[0]["a"] - 0.02 <= t < g[-1]["b"] + 0.08: grp = g
     if not grp: return
-    words = [w["w"].upper().strip(",.\"") for w in grp]
+    words = [w["w"].upper().strip(",.\"'\u2018\u2019\u201c\u201d") for w in grp]
     ctx.select_font_face("Inter", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
     size = 104; ctx.set_font_size(size)
     widths = [ctx.text_extents(w).x_advance for w in words]; space = size * 0.4
@@ -194,7 +248,7 @@ class StoryRenderer:
         if line["scene"] == "phone":
             scene_phone(ctx, t, u, line)
         else:
-            cx, cy, z = camera(line, u)
+            cx, cy, z = camera(line, u, self.looks)
             if "punch" in fx: z *= 1 + 0.08 * max(0, 1 - (t - start) / 0.25)
             sx = sy = 0
             if "shake" in fx: sx, sy = math.sin(t * 61) * 12, math.cos(t * 53) * 10
@@ -202,6 +256,21 @@ class StoryRenderer:
             draw_shot(ctx, self.spec, self.looks, line, t, u)
             ctx.restore()
         if "cold" in fx: ctx.set_source_rgba(0.3, 0.45, 0.9, 0.18); ctx.paint()
+        if "golden" in fx:
+            g = cairo.LinearGradient(0, 0, W * 0.6, H); g.add_color_stop_rgba(0, 1, 0.62, 0.2, 0.55); g.add_color_stop_rgba(1, 0.85, 0.35, 0.1, 0.25)
+            ctx.set_operator(cairo.OPERATOR_SOFT_LIGHT); ctx.set_source(g); ctx.paint(); ctx.set_operator(cairo.OPERATOR_OVER)
+            g = cairo.RadialGradient(W * 0.9, -100, 100, W * 0.9, -100, H * 1.1)
+            g.add_color_stop_rgba(0, 1, 0.75, 0.35, 0.38); g.add_color_stop_rgba(1, 1, 0.55, 0.25, 0.1)
+            ctx.set_source(g); ctx.paint()
+        if "dusk" in fx:
+            g = cairo.LinearGradient(0, 0, 0, H); g.add_color_stop_rgba(0, 0.45, 0.25, 0.6, 0.35); g.add_color_stop_rgba(1, 1, 0.5, 0.25, 0.22)
+            ctx.set_source(g); ctx.paint()
+        if "haze" in fx:
+            for k in range(3):
+                yy = H * (0.55 + 0.12 * k) + math.sin(t * 0.6 + k) * 40
+                g = cairo.LinearGradient(0, yy - 350, 0, yy + 350)
+                g.add_color_stop_rgba(0, 0.9, 0.9, 0.95, 0); g.add_color_stop_rgba(0.5, 0.9, 0.9, 0.95, 0.22 * ease(u * 3)); g.add_color_stop_rgba(1, 0.9, 0.9, 0.95, 0)
+                ctx.set_source(g); ctx.paint()
         if "desat" in fx: ctx.set_source_rgba(0.35, 0.38, 0.45, 0.3); ctx.paint()
         if "memory" in fx:
             ctx.set_source_rgba(1.0, 0.85, 0.55, 0.22); ctx.paint()
