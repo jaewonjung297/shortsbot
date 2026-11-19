@@ -109,20 +109,6 @@ BIBLE_SCHEMA = _obj({
     "beats": {"type": "array", "items": _obj({"section": {"type": "string", "enum": [s for s, _ in SECTIONS]}, "vo": STR,
                                               "visual": STR, "sign": STR, "camera": STR, "light": STR},
                                              ["section", "vo", "visual", "camera"])}})
-_CHAR = _obj({"who": STR, "x": NUM, "emotion": {"type": "string", "enum": EMOTIONS}, "pose": STR,
-              "hair": {"type": "string", "enum": list(HAIR)}, "aura": STR, "float": BOOL, "scale": NUM}, ["who", "x"])
-_LOOK = _obj({"who": STR, "look": {"type": "string", "enum": list(LOOKS)}, "shirt": {"type": "string", "enum": list(SHIRTS)},
-              "hair": {"type": "string", "enum": list(HAIR)}})
-SPEC_SCHEMA = _obj({
-    "title": STR, "tiktok_caption": STR, "voice": STR, "end_card": STR, "pet": {"type": "string", "enum": ["cat", "dog", "none"]},
-    "cast": {"type": "array", "items": _LOOK},
-    "lines": {"type": "array", "items": _obj({
-        "text": STR, "scene": {"type": "string", "enum": list(SCENES)}, "chars": {"type": "array", "items": _CHAR},
-        "cam": STR, "fx": {"type": "array", "items": {"type": "string", "enum": list(FX)}}, "sign": STR, "contact": STR,
-        "messages": {"type": "array", "items": _obj({"from": {"type": "string", "enum": ["me", "them"]}, "text": STR})}},
-        ["text", "scene"])}},
-    ["title", "tiktok_caption", "end_card", "cast", "lines"])
-
 def _fmt():
     return dict(scenes=json.dumps(SCENES), looks=json.dumps(LOOKS), shirts=", ".join(SHIRTS), hair=", ".join(HAIR),
                 emotions=", ".join(EMOTIONS), poses=", ".join(POSES), fx=json.dumps(FX), extras=CHAR_EXTRAS)
@@ -130,9 +116,9 @@ def _fmt():
 def _ask(system, user, check, log, what, schema, max_repairs=4, max_tokens=16000):
     messages = [{"role": "user", "content": user}]
     client = _client()
-    fmt = {"format": {"type": "json_schema", "schema": schema}}
+    extra = {"output_config": {"format": {"type": "json_schema", "schema": schema}}} if schema else {}
     for attempt in range(max_repairs + 1):
-        resp = client.messages.create(model=MODEL, max_tokens=max_tokens, system=system, messages=messages, output_config=fmt)
+        resp = client.messages.create(model=MODEL, max_tokens=max_tokens, system=system, messages=messages, **extra)
         if resp.stop_reason == "refusal": raise SystemExit("Claude declined this request")
         if resp.stop_reason == "max_tokens": raise RuntimeError("%s: reply hit max_tokens" % what)
         text = _text(resp)
@@ -276,7 +262,7 @@ def bible_md(b):
 
 # ------------------------------------------------------------------ spec
 def _from_schema(spec):
-    """Schema-shaped spec (cast list, pet 'none') -> renderer spec."""
+    """Cast list / pet 'none' -> renderer spec."""
     if isinstance(spec.get("cast"), list):
         spec["cast"] = {c["who"]: {k: c[k] for k in ("look", "shirt", "hair")} for c in spec["cast"]}
     if spec.get("pet") == "none": spec["pet"] = None
@@ -286,6 +272,8 @@ def spec_errors(spec, b):
     _from_schema(spec)
     spec["mode"], spec["runtime"] = "in_this_town", b.get("runtime", RUNTIME)
     lines, beats = spec.get("lines", []), b["beats"]
+    if len(lines) == len(beats):
+        for l, x in zip(lines, beats): l["text"] = x["vo"]      # voiceover stays exactly as approved
     timing = set(runtime_errors([l.get("text", "") for l in lines], spec["runtime"], spec.get("speed", SPEED)))
     errs = [e for e in validate(spec) if e not in timing] + format_errors(spec, "in_this_town")
     if len(lines) != len(beats): errs.append("need exactly one line per beat (%d beats, %d lines)" % (len(beats), len(lines)))
@@ -300,6 +288,6 @@ def make_spec(b, notes="", log=print):
     system = SPEC.format(runtime=b.get("runtime", RUNTIME), visuals=VISUALS.format(**dict(_fmt(), schema=SCHEMA)), extras=CHAR_EXTRAS)
     user = "Approved story bible:\n```json\n%s\n```" % json.dumps(b, indent=1, ensure_ascii=False)
     if notes: user += "\n\nCreator notes: %s" % notes
-    spec = _ask(system, user, lambda s: spec_errors(s, b), log, "spec", SPEC_SCHEMA)
+    spec = _ask(system, user, lambda s: spec_errors(s, b), log, "spec", None)
     spec.update(mode="in_this_town", runtime=b.get("runtime", RUNTIME), town_name=b["town_name"])
     return spec
