@@ -1,4 +1,4 @@
-"""Story pipeline stages. Each stage reads/writes one work folder, so GitHub Actions can run them as separate jobs.
+"""Story pipeline stages; each reads and writes one work folder.
 
   python -m shortsbot.story condense  --story story.txt --dir work      # Claude -> spec.json
   python -m shortsbot.story narrate   --dir work                        # Kokoro -> narration.wav, timeline.json

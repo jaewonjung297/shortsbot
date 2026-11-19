@@ -1,9 +1,4 @@
-"""TikTok: build a posting package and (optionally) drop the video into your TikTok inbox as a draft.
-
-Draft ("Upload") mode is deliberate: you open TikTok, add your voiceover, check the caption and post it
-yourself. That keeps a human in the loop, which is what TikTok's originality rules for Creator Rewards
-look for, and it works before your API client has passed TikTok's audit.
-"""
+"""TikTok posting package (caption, script, cover) and inbox draft upload."""
 import json, os, subprocess, time
 import requests
 
@@ -27,7 +22,7 @@ def write_package(spec, video_path, outdir, platform="tiktok"):
     lines += ["", "Stages: " + " -> ".join(s["label"] for s in tl.stages)]
     with open(os.path.join(outdir, "voiceover_script.txt"), "w") as f:
         f.write("\n".join(lines) + "\n")
-    # cover: a frame from the middle of the most dramatic (last) stage
+    # cover: middle of the last stage
     st = tl.stages[-1] if len(tl.stages) > 1 else tl.stages[0]
     t_cover = (st["at"] + min(st["end"], tl.final_at)) / 2
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", "%.2f" % t_cover, "-i", video_path, "-frames:v", "1",
@@ -36,7 +31,7 @@ def write_package(spec, video_path, outdir, platform="tiktok"):
 
 # ------------------------------------------------------------------ auth
 def access_token():
-    """Exchange the stored refresh token for a fresh access token (TikTok rotates refresh tokens)."""
+    """Exchange the refresh token for an access token."""
     r = requests.post(API + "/v2/oauth/token/", headers={"Content-Type": "application/x-www-form-urlencoded"}, data={
         "client_key": os.environ["TIKTOK_CLIENT_KEY"], "client_secret": os.environ["TIKTOK_CLIENT_SECRET"],
         "grant_type": "refresh_token", "refresh_token": os.environ["TIKTOK_REFRESH_TOKEN"]}, timeout=30)
@@ -44,7 +39,7 @@ def access_token():
     if "access_token" not in data: raise RuntimeError("TikTok token refresh failed: %s" % data)
     new_rt = data.get("refresh_token")
     if new_rt and new_rt != os.environ["TIKTOK_REFRESH_TOKEN"]:
-        # Refresh tokens last ~1 year and may rotate. Surface the new one so a scheduler can store it.
+        # rotated refresh token -> TIKTOK_REFRESH_TOKEN_OUT
         path = os.environ.get("TIKTOK_REFRESH_TOKEN_OUT")
         if path:
             with open(path, "w") as f: f.write(new_rt)
@@ -52,7 +47,7 @@ def access_token():
 
 # ------------------------------------------------------------------ inbox upload
 def send_to_inbox(video_path, log=print, poll_seconds=120):
-    """Upload the video to the creator's TikTok inbox as a draft (Content Posting API, video.upload scope)."""
+    """Upload the video to the TikTok inbox as a draft (video.upload scope)."""
     tok = access_token()
     size = os.path.getsize(video_path)
     if size > 64 * 1024 * 1024:

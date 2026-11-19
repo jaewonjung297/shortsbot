@@ -1,4 +1,4 @@
-"""Drawing kit for story videos: toy-like blocks, faces, people, pets and rooms (all original designs)."""
+"""Drawing kit for story videos: blocky characters, faces, pets and rooms."""
 import math, random
 import cairo
 

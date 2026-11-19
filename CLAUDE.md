@@ -13,16 +13,17 @@ local, gitignored `.env` (see `.env.example`); GitHub secrets are write-only and
 ## Current direction (Nov 2026)
 1. **Platform: TikTok first** (Instagram Reels code exists but is parked). TikTok Creator Rewards only pays for
    videos **over 1 minute**, so target 65–85 s.
-2. **Format: switching from "What if…?" videos to narrated Reddit stories** (r/AmIOverreacting style). The user
-   pastes a post; Claude condenses it **in its own words** into a shot list; blocky original characters act it
-   out with big word-by-word captions (white, black outline, current word yellow) and a TTS narrator.
+2. **Format: narrated Reddit stories** (r/AmIOverreacting style) in an **imitation-Roblox look**: blocky,
+   Roblox-style characters that are original designs (no Roblox assets, avatars, names or logos). The user
+   pastes a post; Claude condenses it **in its own words** into a shot list; the characters act it out with big
+   word-by-word captions (white, black outline, current word yellow) and a TTS narrator. "What if…?" videos are
+   legacy: keep the code working but don't develop it.
 3. **Human in the loop:** videos go to the TikTok inbox as **drafts** (Upload mode); the user adds their own
    voice/edits and posts from the app. Don't build auto-publishing: platforms demonetize mass-produced,
    unattended AI content, and narrated Reddit stories with TTS are a named risk.
-4. **Wanted next:** a nice way to paste a story and *watch the pipeline run*. The plan is a terminal command
-   (`story` CLI using `gh`) that triggers a multi-job GitHub Actions workflow
-   (condense → narrate → render (matrix) → assemble → deliver) and shows live job status, plus the normal
-   Actions pipeline graph on GitHub.
+4. **Paste a story and watch the pipeline run:** `scripts/story` (uses `gh`) triggers the multi-job
+   `story.yml` workflow (condense → narrate → render (matrix) → assemble → deliver) and shows live job status;
+   the Actions page shows the pipeline graph. Written and linted, not yet run on GitHub.
 
 ## Layout
 ```
@@ -42,7 +43,7 @@ examples/                                        hand-written specs (blackout_ca
 TERMS.md, PRIVACY.md                             linked from the TikTok developer app
 ```
 
-### Reddit-story pipeline: branch `reddit-story-wip` (written, NOT yet tested end to end)
+### Reddit-story pipeline: branch `reddit-story-wip` (tested locally end to end, Nov 19 2026)
 ```
 shortsbot/story/
   art.py        drawing kit: toy-like blocks, faces (happy/sad/angry/shocked/...), people, cat, white dog, rooms
@@ -52,26 +53,33 @@ shortsbot/story/
                 -> narration.wav + timeline.json with estimated per-word timings
   render.py     spec + timeline -> frames; camera presets (wide/medium/push/closeup:<who>); captions; end card
   music.py      soft piano bed, cut swooshes, booms on dramatic lines, text pings, ducking under the voice
-  __main__.py   stages: condense | narrate | render --part k --parts n | assemble | all | preview
-examples/story_cat.json   hand-converted spec of the first test story (mom selling the cat), incl. a phone scene
+  __main__.py   stages: condense | narrate | render --part k --parts n | assemble | deliver | all | preview
+examples/story_cat.json      hand-converted spec of the first test story (mom selling the cat), incl. a phone scene
+.github/workflows/story.yml  jobs: condense -> narrate -> render (matrix) -> assemble -> deliver (TikTok inbox)
+scripts/story                terminal CLI: paste a post (or --example story_cat), triggers story.yml via `gh`,
+                             streams job status with `gh run watch`, downloads the video into out/story-<run id>/
 ```
-Next steps on that branch: run `python -m shortsbot.story narrate/preview/all --dir work` with
-`examples/story_cat.json` copied to `work/spec.json`, fix rendering issues, then add `.github/workflows/story.yml`
-(jobs: condense → narrate → render matrix → assemble → deliver to TikTok inbox via `tiktok.send_to_inbox`) and the
-terminal CLI. Characters must stay **original** (not Roblox's avatars/branding).
+Verified locally (macOS, Python 3.11 venv in `.venv`, brew ffmpeg): narrate -> preview -> all on `story_cat.json`
+gives a 76.7 s 1080x1920 video at -14.3 LUFS in ~55 s with 6 render processes. Fixed: close-ups now frame head and
+shoulders so the caption no longer covers the eyes.
+Not yet verified: `condense` against the live Claude API, `story.yml` on GitHub (needs the branch pushed; try
+`scripts/story --example story_cat --no-inbox` first), and `deliver` (needs the TikTok secrets).
+kokoro-onnx/onnxruntime may lack wheels for brand-new Pythons (3.15); use 3.11/3.12. Characters must stay
+**original** (not Roblox's avatars/branding).
 
 ## Status of external setup
-- GitHub: repo pushed; secret `ANTHROPIC_API_KEY` added by the user.
+- GitHub: `gh` logged in locally. Secrets set: `ANTHROPIC_API_KEY`, `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`.
+  `TIKTOK_REFRESH_TOKEN` was obtained via `get_tiktok_token.py` on Nov 19 2026 but not yet confirmed as a secret.
+- Branch `reddit-story-wip` is not pushed; `story.yml` must reach `main` before it can be dispatched.
 - TikTok: developer app "shortsbot" created; **Sandbox** configured (Login Kit + Content Posting API, scopes
   `user.info.basic` + `video.upload`, Desktop redirect `http://localhost:8723/callback/`, Direct Post off).
-  Still to do by the user: upload app icon, Apply changes, add own account as Target User, put the **sandbox**
-  client key/secret in `.env`, run `python3 scripts/get_tiktok_token.py`, store `TIKTOK_CLIENT_KEY`,
-  `TIKTOK_CLIENT_SECRET`, `TIKTOK_REFRESH_TOKEN` as GitHub secrets. Unverified: whether sandbox allows inbox
-  uploads without app review; first real run will tell.
-- Nothing has been run against the live Claude/TikTok/Instagram/YouTube APIs yet (only mocked).
+  OAuth works (refresh token obtained). Unverified: whether sandbox allows inbox uploads without app review.
+- Live runs so far: "What if" `tiktok-draft` run 44470883670 (Nov 19 2026) wrote and rendered a video via the
+  Claude API, then failed at the inbox upload because `TIKTOK_REFRESH_TOKEN` wasn't a secret yet.
 
 ## Conventions and gotchas
-- macOS: use `python3`. Fonts: Inter (captions/HUD) and Caladea (serif); Actions installs `fonts-inter` and
+- Code comments: short and descriptive only; no rationale, design history or conversation notes.
+- macOS: use the `.venv` (Python 3.11); Homebrew's `python3` is 3.15 and lacks onnxruntime wheels. Fonts: Inter (captions/HUD) and Caladea (serif); Actions installs `fonts-inter` and
   `fonts-crosextra-caladea`.
 - Rendering: one encoded file per chunk/part, joined with the concat demuxer (`-c copy`), audio muxed with
   `-c:v copy`; write to a temp name and rename on success. ~0.03–0.1 s per frame on one core.

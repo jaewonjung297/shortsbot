@@ -18,7 +18,7 @@ on:
         description: "Send the video to my TikTok inbox as a draft"
         type: boolean
         default: true
-  # Uncomment to get a fresh draft in your TikTok inbox every morning (you still review and post it):
+  # daily draft:
   # schedule:
   #   - cron: "23 12 * * *"
 
