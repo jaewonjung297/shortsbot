@@ -73,6 +73,10 @@ gives a 76.7 s 1080x1920 video at -14.3 LUFS in ~55 s with 6 render processes. F
 shoulders so the caption no longer covers the eyes.
 Not yet verified: `condense` against the live Claude API (first run with a real pasted post).
 Apt packages come from `.github/actions/system-packages` (cached .debs, fallback mirrors).
+HUSS HUSS sound: `narrate.py` splits each line at every "HUSS HUSS" pair, speaks the rest with Kokoro and splices in
+`shortsbot/story/assets/huss_huss.wav` (cut from an earlier narration), level-matched to the line, with caption
+timings from the clip's exact position. `HUSS_CLIP=/path` uses another recording (any ffmpeg format); `HUSS_CLIP=`
+turns it off. Feed Whisper 16 kHz audio (narration is 24 kHz) or its timestamps come out 1.5x too late.
 Narration: Kokoro at <= 1.15x (`TTS_SPEED`), then ffmpeg `atempo` up to the spec speed (default 1.575); Kokoro itself
 swallows first words and slurs above ~1.3x. Caption groups are capped at 14 characters so text stays full size.
 `in_this_town` (pitch/bible/spec) tested locally against the live API (Nov 19 2026): pitches 18 s, bible ~1-4 min,

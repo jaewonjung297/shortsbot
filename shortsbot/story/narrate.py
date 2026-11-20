@@ -45,6 +45,37 @@ def _stretch(x, tempo):
                        capture_output=True, check=True)
     return np.frombuffer(p.stdout, dtype=np.float32)
 
+HUSS_CLIP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "huss_huss.wav")
+CLIP_PAD = 0.05            # silence on each side of the clip, seconds
+
+def _is_huss(word): return re.sub(r"[^a-z]", "", word.lower()) == "huss"
+
+def segments(words):
+    """Split a line's words into runs: ("tts", words) and ("clip", words) for each HUSS HUSS pair."""
+    out, cur, j = [], [], 0
+    while j < len(words):
+        if j + 1 < len(words) and _is_huss(words[j]) and _is_huss(words[j + 1]):
+            if cur: out.append(("tts", cur)); cur = []
+            out.append(("clip", words[j:j + 2])); j += 2
+        else:
+            cur.append(words[j]); j += 1
+    if cur: out.append(("tts", cur))
+    return out
+
+def load_clip():
+    """The HUSS HUSS sound at SR (path from $HUSS_CLIP, default assets/huss_huss.wav; empty disables it)."""
+    path = os.environ.get("HUSS_CLIP", HUSS_CLIP)
+    if not path: return None
+    if not os.path.exists(path): raise FileNotFoundError("HUSS_CLIP not found: %s" % path)
+    p = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-f", "f32le", "-ac", "1", "-ar", str(SR), "pipe:1"],
+                       capture_output=True, check=True)
+    return np.frombuffer(p.stdout, dtype=np.float32).copy()
+
+def _rms(x):
+    env = np.convolve(np.abs(x), np.ones(240) / 240, mode="same")
+    act = x[env > 0.2 * env.max()] if len(x) else x
+    return float(np.sqrt(np.mean(act ** 2))) if len(act) else 0.0
+
 def _weights(words):
     w = []
     for j, wd in enumerate(words):
@@ -65,18 +96,38 @@ def narrate(spec, outdir, log=print):
     voice = spec.get("voice", "af_heart")
     if voice not in k.get_voices(): voice = "af_heart"
     speed = float(spec.get("speed", SPEED))
+    clip = load_clip()
     audio, lines, t = [np.zeros(int(0.35 * SR))], [], 0.35
     n = len(spec["lines"])
+    def tts(text):
+        samples, _ = k.create(spoken(text), voice=voice, speed=min(speed, TTS_SPEED), lang="en-us")
+        return _trim(_stretch(np.asarray(samples, dtype=np.float32), speed / min(speed, TTS_SPEED)))
     for i, L in enumerate(spec["lines"]):
-        samples, _ = k.create(spoken(L["text"]), voice=voice, speed=min(speed, TTS_SPEED), lang="en-us")
-        x = _trim(_stretch(np.asarray(samples, dtype=np.float32), speed / min(speed, TTS_SPEED)))
+        words = L["text"].split()
+        segs = segments(words) if clip is not None else [("tts", words)]
+        speakable = lambda ws: re.search(r"[A-Za-z0-9]", " ".join(ws))
+        parts = [(kind, ws, tts(" ".join(ws)) if kind == "tts" and speakable(ws) else np.zeros(0)) for kind, ws in segs]
+        level = _rms(np.concatenate([x for kind, _, x in parts if kind == "tts"] or [np.zeros(1)]))
+        pieces, timed = [], []
+        pos = 0.0
+        for kind, ws, x in parts:
+            if kind == "clip":
+                c = clip * (min(3.0, level / _rms(clip)) if level > 0 and _rms(clip) > 0 else 1.0)
+                pad = np.zeros(int(CLIP_PAD * SR))
+                x = np.concatenate([pad if pieces else np.zeros(0), c, pad])
+                a0 = pos + (CLIP_PAD if pieces else 0.0); half = len(c) / SR / len(ws)
+                timed += [(w, a0 + j * half, a0 + (j + 1) * half) for j, w in enumerate(ws)]
+            else:
+                d = len(x) / SR; ww = _weights(ws)
+                cum = np.concatenate([[0], np.cumsum(ww)]) / ww.sum() * max(0.0, d - 0.08) + min(0.03, d)
+                timed += [(w, pos + cum[j], pos + cum[j + 1]) for j, w in enumerate(ws)]
+            pieces.append(x); pos += len(x) / SR
+        x = np.concatenate(pieces)
         dur = len(x) / SR
-        words = L["text"].split(); ww = _weights(words)
-        cum = np.concatenate([[0], np.cumsum(ww)]) / ww.sum() * (dur - 0.08) + 0.03
         hold = 1.2 if L["scene"] == "phone" else 0.0          # extra hold on text-message shots
         gap = (0.38 if i < n - 1 else 1.6) + hold
         lines.append(dict(i=i, start=round(t, 3), end=round(t + dur, 3), shot_end=round(t + dur + gap, 3),
-                          words=[dict(w=words[j], a=round(t + cum[j], 3), b=round(t + cum[j + 1], 3)) for j in range(len(words))]))
+                          words=[dict(w=w, a=round(t + a, 3), b=round(t + b, 3)) for w, a, b in timed]))
         audio += [x, np.zeros(int(gap * SR))]
         t += dur + gap
         log("narrate: %2d/%d %4.1fs %s" % (i + 1, n, dur, L["text"][:60]))
