@@ -74,7 +74,8 @@ shoulders so the caption no longer covers the eyes.
 Not yet verified: `condense` against the live Claude API (first run with a real pasted post).
 Apt packages come from `.github/actions/system-packages` (cached .debs, fallback mirrors).
 HUSS HUSS sound: `narrate.py` splits each line at every "HUSS HUSS" pair, speaks the rest with Kokoro and splices in
-`shortsbot/story/assets/huss_huss.wav` (cut from an earlier narration), level-matched to the line, with caption
+`shortsbot/story/assets/huss_huss.wav` (a "HUSS HUSS HUSS" triplet cut from another creator's #inthistown Short at
+37.1 s, chosen by the user; third-party audio, so swap in an own recording before monetizing), level-matched to the line, with caption
 timings from the clip's exact position. `HUSS_CLIP=/path` uses another recording (any ffmpeg format); `HUSS_CLIP=`
 turns it off. Feed Whisper 16 kHz audio (narration is 24 kHz) or its timestamps come out 1.5x too late.
 Narration: Kokoro at <= 1.15x (`TTS_SPEED`), then ffmpeg `atempo` up to the spec speed (default 1.575); Kokoro itself

@@ -58,7 +58,7 @@ changes, glowing auras, floating, shrunk or giant characters, and golden-hour, d
 
 Every `reddit_story` and `in_this_town` video opens with **"In this town, everyone goes HUSS HUSS."** and
 uses "HUSS HUSS" at least 3 more times. Every "HUSS HUSS" is the same recorded sound
-(`shortsbot/story/assets/huss_huss.wav`) spliced into the narration instead of the TTS voice saying it; set
+(`shortsbot/story/assets/huss_huss.wav`, a "HUSS HUSS HUSS" triplet from an existing Short) spliced into the narration instead of the TTS voice saying it; set
 `HUSS_CLIP=/path/to/your.wav` to use your own recording, or `HUSS_CLIP=` to let the TTS say it. Reddit stories are retold as if they happen in that town: townspeople,
 town places, neighbors and gossip reacting, with the town mentioned in at least 6 lines. Claude is sent back to
 fix any script that breaks this (`OPENER`, `HUSS_MIN`, `TOWN_MIN` and `format_errors` in
