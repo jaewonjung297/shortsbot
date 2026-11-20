@@ -113,14 +113,17 @@ def _fmt():
     return dict(scenes=json.dumps(SCENES), looks=json.dumps(LOOKS), shirts=", ".join(SHIRTS), hair=", ".join(HAIR),
                 emotions=", ".join(EMOTIONS), poses=", ".join(POSES), fx=json.dumps(FX), extras=CHAR_EXTRAS)
 
-def _ask(system, user, check, log, what, schema, max_repairs=4, max_tokens=16000):
+def _ask(system, user, check, log, what, schema, max_repairs=4, max_tokens=24000):
     messages = [{"role": "user", "content": user}]
     client = _client()
     extra = {"output_config": {"format": {"type": "json_schema", "schema": schema}}} if schema else {}
     for attempt in range(max_repairs + 1):
         resp = client.messages.create(model=MODEL, max_tokens=max_tokens, system=system, messages=messages, **extra)
         if resp.stop_reason == "refusal": raise SystemExit("Claude declined this request")
-        if resp.stop_reason == "max_tokens": raise RuntimeError("%s: reply hit max_tokens" % what)
+        if resp.stop_reason == "max_tokens":
+            log("%s: attempt %d: reply hit max_tokens, retrying" % (what, attempt + 1))
+            messages = messages[:1]
+            continue
         text = _text(resp)
         try:
             out = _json(text)
