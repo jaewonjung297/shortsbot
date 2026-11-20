@@ -7,6 +7,36 @@ WORDS_OK = (280, 380)          # accepted range at SPEED
 LINES = (18, 34)
 MODES = ["reddit_story", "in_this_town"]
 
+SEC_PER_SYL, SEC_PER_PAUSE, SEC_PER_WORD = 0.109, 0.204, 0.2   # Kokoro at SPEED, fitted on rendered timelines
+GAP, LEAD, TAIL = 0.38, 0.35, 1.6
+
+def line_seconds(text, speed=SPEED):
+    """Spoken length of one line."""
+    syl = sum(max(1, len(re.findall(r"[aeiouy]+", re.sub(r"[^a-z]", "", w.lower())))) for w in text.split())
+    pauses = len(re.findall(r"[,.;:!?\u2014-]\s", text + " "))
+    return (SEC_PER_SYL * syl + SEC_PER_PAUSE * pauses) * SPEED / float(speed)
+
+def estimate_seconds(texts, speed=SPEED):
+    """Narration length for these lines (matches narrate.py's gaps)."""
+    return LEAD + sum(line_seconds(t, speed) for t in texts) + GAP * max(0, len(texts) - 1) + TAIL
+
+def runtime_lines(runtime):
+    """Line (= shot) count range for a runtime: one shot every ~1.9-3 s."""
+    return max(6, round(runtime / 3.0)), max(8, round(runtime / 1.9))
+
+def runtime_errors(texts, runtime, speed=SPEED):
+    est = estimate_seconds(texts, speed)
+    errs = []
+    if abs(est - runtime) > max(3.0, 0.1 * runtime):
+        words = sum(len(t.split()) for t in texts)
+        want = round(words * (runtime - LEAD - TAIL - GAP * (len(texts) - 1)) / max(1, est - LEAD - TAIL - GAP * (len(texts) - 1)))
+        errs.append("narration runs about %.0f s but the target is %d s; use about %d words in total (now %d)" % (est, runtime, want, words))
+    elif runtime >= 60 and est < 62:
+        errs.append("narration runs about %.0f s; it must stay over 60 s for TikTok, add a few words" % est)
+    lo, hi = runtime_lines(runtime)
+    if not lo <= len(texts) <= hi: errs.append("need %d-%d lines for %d s (have %d)" % (lo, hi, runtime, len(texts)))
+    return errs
+
 def word_range(speed=SPEED, rng=WORDS):
     """Word range scaled to the narration speed."""
     k = float(speed) / SPEED
@@ -22,7 +52,8 @@ SCENES = {
     "exterior": "street of houses from outside; characters optional (use fx 'night' for night, 'party' for party lights)",
     "phone": "full-screen text-message conversation; needs 'contact' and 'messages'",
 }
-LOOKS = {"young_woman": "long hair", "young_man": "short hair", "older_woman": "hair in a bun", "older_man": "short gray hair"}
+LOOKS = {"young_woman": "long hair", "young_man": "short hair", "older_woman": "hair in a bun", "older_man": "short gray hair",
+         "kid_girl": "child (smaller), long hair", "kid_boy": "child (smaller), short hair"}
 SHIRTS = {"lavender": (0.68, 0.58, 0.92), "red": (0.78, 0.22, 0.28), "blue": (0.3, 0.5, 0.85), "green": (0.35, 0.65, 0.45),
           "yellow": (0.95, 0.8, 0.3), "orange": (0.95, 0.55, 0.25), "pink": (0.95, 0.55, 0.7), "black": (0.18, 0.18, 0.2),
           "white": (0.93, 0.93, 0.95), "gray": (0.55, 0.56, 0.6), "teal": (0.25, 0.65, 0.65)}
@@ -36,7 +67,13 @@ FX = {"hearts": "floating hearts", "sweat": "sweat drop on the first character",
       "shake": "screen shake", "punch": "quick zoom punch on the cut", "redflash": "pulsing red tint (anger)",
       "cold": "blue tint + shivering", "desat": "gloomy desaturated tint", "memory": "warm flashback glow",
       "dark": "vignette closing in (ominous)", "fluff": "fluff/mess flying around (chaos)",
-      "night": "night sky with moon and stars (exterior)", "party": "pulsing colored party lights"}
+      "night": "night sky with moon and stars (exterior)", "party": "pulsing colored party lights",
+      "golden": "low warm sun, long shadows", "haze": "soft haze rolling in (rising tension)",
+      "dusk": "orange-purple evening light"}
+AURAS = ["gold", "blue", "green", "red", "purple", "white"]
+CHAR_EXTRAS = """Optional per-character fields to SHOW a town rule: "hair": <hair color, overrides the cast hair for this shot>,
+"aura": one of %s (glow around them), "float": true (hovering), "scale": 0.5-1.5 (shrunk or giant).
+Optional per-shot "sign": text (<= 40 chars) on an in-world sign behind the characters (a signpost outdoors, a banner indoors).""" % ", ".join(AURAS)
 
 SCHEMA = """
 {
@@ -78,15 +115,19 @@ def validate(spec):
     if pet not in (None, *PETS): errs.append("pet must be cat, dog or null")
     if len(spec.get("end_card", "")) > 24: errs.append("end_card max 24 chars")
     lines = spec["lines"]
-    if not (LINES[0] <= len(lines) <= LINES[1]): errs.append("need %d-%d lines (have %d)" % (*LINES, len(lines)))
-    words = sum(len(l.get("text", "").split()) for l in lines)
     speed = spec.get("speed", SPEED)
-    lo, hi = word_range(speed, WORDS_OK)
-    if not (lo <= words <= hi):
-        errs.append("narration is %d words; aim for %d-%d words (about 65-85 seconds)" % (words, *word_range(speed)))
+    if spec.get("runtime"):
+        errs += runtime_errors([l.get("text", "") for l in lines], int(spec["runtime"]), speed)
+    else:
+        if not (LINES[0] <= len(lines) <= LINES[1]): errs.append("need %d-%d lines (have %d)" % (*LINES, len(lines)))
+        words = sum(len(l.get("text", "").split()) for l in lines)
+        lo, hi = word_range(speed, WORDS_OK)
+        if not (lo <= words <= hi):
+            errs.append("narration is %d words; aim for %d-%d words (about 65-85 seconds)" % (words, *word_range(speed)))
     for i, l in enumerate(lines):
         t = l.get("text", "")
         if not t or len(t) > 200: errs.append("line %d: text required, max 200 chars" % i)
+        if len(l.get("sign") or "") > 40: errs.append("line %d: sign max 40 chars" % i)
         sc = l.get("scene")
         if sc not in SCENES: errs.append("line %d: scene must be one of %s" % (i, list(SCENES))); continue
         if sc == "phone":
@@ -109,6 +150,10 @@ def validate(spec):
                 if c.get("pose", "idle") not in POSES: errs.append("line %d: pose must be one of %s" % (i, POSES))
                 if c.get("pose") == "hold_pet" and not pet: errs.append("line %d: hold_pet needs spec.pet" % i)
                 if c.get("pose") == "lying" and sc != "bed": errs.append("line %d: pose 'lying' only in scene 'bed'" % i)
+                if c.get("hair", "brown") not in HAIR: errs.append("line %d: hair must be one of %s" % (i, list(HAIR)))
+                if c.get("aura") not in (None, *AURAS): errs.append("line %d: aura must be one of %s" % (i, AURAS))
+                sc_ = c.get("scale", 1.0)
+                if not isinstance(sc_, (int, float)) or not 0.5 <= sc_ <= 1.5: errs.append("line %d: scale must be 0.5-1.5" % i)
             x = c.get("x", 0.5)
             if not isinstance(x, (int, float)) or not 0 <= x <= 1: errs.append("line %d: x must be 0..1" % i)
         cam = l.get("cam", "wide")

@@ -18,7 +18,10 @@ local, gitignored `.env` (see `.env.example`); GitHub secrets are write-only and
    pastes a post; Claude condenses it **in its own words** into a shot list; the characters act it out with big
    word-by-word captions (white, black outline, current word yellow) and a TTS narrator.
    **Modes** (`story.yml` input `mode`, `scripts/story --mode`): `reddit_story` (default), `in_this_town`
-   (Claude writes 3-4 deadpan "In this town, everybody... Except me." bits from an optional premise; same renderer),
+   (`story/town.py`, follows the user's showrunner brief: no rule -> pitch 10 rules and stop; rule -> Step 1 story
+   bible `bible.md` (title, town name, logline, planted details A/B/C tracker, timed beat script) and stop for
+   approval; approved (`from_run` + `approved`, or `--yes`) -> spec -> render. `bible_errors` enforces the visual-first
+   sign, the 5-part arc by runtime share, plant/payoff positions, no moral at the end, and the runtime target),
    and `what_if` (legacy "What if…?" pipeline, run via `tiktok.yml` as a reusable workflow; keep working, don't develop).
    **Every condensed video** (both modes) opens with "In this town, everyone goes HUSS HUSS." and has >= 3 more
    "HUSS HUSS"; Reddit stories are reframed as happening in that town (townspeople, town places, gossip; "town" in
@@ -54,6 +57,7 @@ shortsbot/story/
   art.py        drawing kit: toy-like blocks, faces (happy/sad/angry/shocked/...), people, cat, white dog, rooms
   spec.py       story spec schema + validator (cast looks, scenes incl. 'phone' text-message scene, poses, fx)
   condense.py   Claude: pasted post -> spec (paraphrase, privacy, 300-360 words, 18-34 lines; narration speed 1.575) with repair loop
+  town.py       in_this_town: rule pitches -> story bible (approval checkpoint) -> spec, with bible_errors validator
   narrate.py    Kokoro TTS (kokoro-onnx; model files auto-download from GitHub releases into ~/.cache/kokoro)
                 -> narration.wav + timeline.json with estimated per-word timings
   render.py     spec + timeline -> frames; camera presets (wide/medium/push/closeup:<who>); captions; end card
@@ -69,9 +73,20 @@ gives a 76.7 s 1080x1920 video at -14.3 LUFS in ~55 s with 6 render processes. F
 shoulders so the caption no longer covers the eyes.
 Not yet verified: `condense` against the live Claude API (first run with a real pasted post).
 Apt packages come from `.github/actions/system-packages` (cached .debs, fallback mirrors).
+HUSS HUSS sound: `narrate.py` splits each line at every "HUSS HUSS" pair, speaks the rest with Kokoro and splices in
+`shortsbot/story/assets/huss_huss.wav` (a "HUSS HUSS HUSS" triplet cut from another creator's #inthistown Short at
+37.1 s, chosen by the user; third-party audio, so swap in an own recording before monetizing), level-matched to the line, with caption
+timings from the clip's exact position. `HUSS_CLIP=/path` uses another recording (any ffmpeg format); `HUSS_CLIP=`
+turns it off. Feed Whisper 16 kHz audio (narration is 24 kHz) or its timestamps come out 1.5x too late.
 Narration: Kokoro at <= 1.15x (`TTS_SPEED`), then ffmpeg `atempo` up to the spec speed (default 1.575); Kokoro itself
 swallows first words and slurs above ~1.3x. Caption groups are capped at 14 characters so text stays full size.
-`in_this_town` tested locally (Nov 19 2026): valid spec after JSON repairs, 86 s narration, night/party exterior.
+`in_this_town` (pitch/bible/spec) tested locally against the live API (Nov 19 2026): pitches 18 s, bible ~1-4 min,
+spec ~1 min, 83 s render. On GitHub (branch `in-this-town-showrunner`): pitch run 44577284084, bible run 44577462020,
+approved render run 44578837126 (60 s target, 69.0 s video). Pitch and bible calls use structured outputs
+(`output_config.format`, JSON schemas in `town.py`); forced tool use 400s on Sonnet 5.5. The spec call is plain JSON:
+with a schema Claude stopped after 2 lines. The code copies each beat's voiceover into its line. Narration length model: `spec.estimate_seconds`
+(syllables + pauses, fitted on renders). Renderer extras for rules: kid looks, `sign`, per-char `hair`/`aura`/`float`/
+`scale`, fx `golden`/`dusk`/`haze`.
 kokoro-onnx/onnxruntime may lack wheels for brand-new Pythons (3.15); use 3.11/3.12. Characters must stay
 **original** (not Roblox's avatars/branding).
 

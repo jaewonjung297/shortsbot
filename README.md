@@ -28,14 +28,38 @@ post ──▶ condense ──▶ narrate ──▶ render (parallel parts) ─�
 | mode | input | what you get |
 |---|---|---|
 | `reddit_story` (default) | a pasted Reddit post | the post retold in Claude's own words, 65–85 s |
-| `in_this_town` | a premise, or nothing for fresh ideas | 3–4 deadpan "In this town, everybody… Except me." bits, 65–85 s |
+| `in_this_town` | a town rule, or nothing for 10 pitched rules | a kid-hero story about one town rule, ending on a Part 2 cliffhanger; 20–150 s (default 75) |
 | `what_if` | a premise, or nothing | the legacy low-poly "What if…?" video (see the end of this file) |
 
 `reddit_story` and `in_this_town` share the same characters, scenes, narration and captions; only Claude's
-prompt differs. `what_if` runs the separate legacy pipeline (`tiktok.yml`) from the same workflow.
+prompts differ. `what_if` runs the separate legacy pipeline (`tiktok.yml`) from the same workflow.
+
+### `in_this_town`: pitch → story bible → video
+
+Claude acts as showrunner and scene/camera director (`shortsbot/story/town.py`), with two stops for you:
+
+1. **No rule given:** Claude pitches 10 visually readable rules (the rule, what frame 1 shows, why curiosity
+   spikes) and the run stops. Pick one.
+2. **Rule given:** Claude writes the Step 1 story bible (`bible.md`): title, town name, logline, the planted-details
+   tracker, and a beat-by-beat script with timestamps, voiceover, on-screen cues and camera notes. The run stops
+   for your approval or tweaks.
+3. **Approved:** the bible becomes the shot spec (voiceover copied word for word), then narrate → render → deliver.
+
+The bible is checked and sent back to Claude until it follows the rules: beat 1 shows the rule with an in-world
+sign naming the town; the arc runs hook (0–15%) → life under the rule (15–35%) → anomaly & disruptor (35–60%) →
+the kid's move & twist (60–85%) → cliffhanger (85–100%), with no moral at the end; exactly three planted
+details (A: a phrase the kid repeats, B: something out of place, C: Grandma's saying), each planted in the first
+half and paid off in the twist or cliffhanger; 3–16 words per beat (a cut every 1–3 s); and a narration length
+that matches the runtime target. Timestamps and the length check come from a narration timing model
+(`estimate_seconds` in `spec.py`, within about 3 s of real renders).
+
+For these stories the renderer adds kid characters (`kid_girl`, `kid_boy`), in-world signs, per-shot hair-color
+changes, glowing auras, floating, shrunk or giant characters, and golden-hour, dusk and haze lighting.
 
 Every `reddit_story` and `in_this_town` video opens with **"In this town, everyone goes HUSS HUSS."** and
-uses "HUSS HUSS" at least 3 more times. Reddit stories are retold as if they happen in that town: townspeople,
+uses "HUSS HUSS" at least 3 more times. Every "HUSS HUSS" is the same recorded sound
+(`shortsbot/story/assets/huss_huss.wav`, a "HUSS HUSS HUSS" triplet from an existing Short) spliced into the narration instead of the TTS voice saying it; set
+`HUSS_CLIP=/path/to/your.wav` to use your own recording, or `HUSS_CLIP=` to let the TTS say it. Reddit stories are retold as if they happen in that town: townspeople,
 town places, neighbors and gossip reacting, with the town mentioned in at least 6 lines. Claude is sent back to
 fix any script that breaks this (`OPENER`, `HUSS_MIN`, `TOWN_MIN` and `format_errors` in
 `shortsbot/story/condense.py`). Hand-written specs and `--from-run` specs are not checked.
@@ -48,8 +72,10 @@ fix any script that breaks this (`OPENER`, `HUSS_MIN`, `TOWN_MIN` and `format_er
 pbpaste | scripts/story                    # post from the clipboard
 scripts/story post.txt                     # post from a file
 scripts/story --example story_cat          # skip Claude, render examples/story_cat.json
-scripts/story --mode in_this_town --premise "everyone parties except me"
-scripts/story --mode in_this_town          # Claude invents the premises
+scripts/story --mode in_this_town          # pitch 10 rules -> pick -> approve the bible -> video
+scripts/story --mode in_this_town --rule "In this town, your hair turns gray when you stop being curious." \
+              --runtime 60 --town-name Dimwick
+scripts/story --mode in_this_town --rule "..." --yes   # all steps at once, no approval stop
 scripts/story --mode what_if --premise "What if the Moon came twice as close?"
 scripts/story --from-run <run id>          # re-render an earlier run's script without calling Claude
 scripts/story --no-inbox --voice am_adam --notes "keep it light" post.txt

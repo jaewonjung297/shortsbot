@@ -1,6 +1,9 @@
 """Story pipeline stages; each reads and writes one work folder.
 
   python -m shortsbot.story condense  --story story.txt --dir work      # Claude -> spec.json
+  python -m shortsbot.story pitch     --mode in_this_town --dir work    # 10 town-rule pitches -> pitches.md
+  python -m shortsbot.story bible     --story rule.txt --runtime 75 --dir work   # story bible -> bible.md (approve it)
+  python -m shortsbot.story condense  --mode in_this_town --dir work    # approved bible.json -> spec.json
   python -m shortsbot.story narrate   --dir work                        # Kokoro -> narration.wav, timeline.json
   python -m shortsbot.story render    --dir work --part 0 --parts 4     # frames -> part_0.mp4
   python -m shortsbot.story assemble  --dir work                        # join + music + mix -> short.mp4 + package
@@ -17,10 +20,36 @@ def log(*a): print(time.strftime("[%H:%M:%S]"), *a, flush=True)
 
 def load(d, name): return json.load(open(os.path.join(d, name)))
 
+def stage_pitch(a):
+    from .town import pitch, pitches_md
+    ps = pitch(open(a.story).read() if a.story else "", notes=a.notes or "", log=log)
+    os.makedirs(a.dir, exist_ok=True)
+    json.dump(ps, open(os.path.join(a.dir, "pitches.json"), "w"), indent=1, ensure_ascii=False)
+    open(os.path.join(a.dir, "pitches.md"), "w").write(pitches_md(ps))
+    for i, p in enumerate(ps, 1): log("%2d. %s" % (i, p["rule"]))
+
+def stage_bible(a):
+    from .town import bible, bible_md
+    path = os.path.join(a.dir, "bible.json")
+    prev = load(a.dir, "bible.json") if os.path.exists(path) else None
+    rule = open(a.story).read().strip() if a.story else (prev or {}).get("rule", "")
+    if not rule: sys.exit("bible needs a town rule (--story rule.txt)")
+    runtime = a.runtime or (prev or {}).get("runtime") or 75
+    b = bible(rule, runtime=runtime, town_name=a.town_name or "", notes=a.notes or "", previous=prev, log=log)
+    os.makedirs(a.dir, exist_ok=True)
+    json.dump(b, open(path, "w"), indent=1, ensure_ascii=False)
+    open(os.path.join(a.dir, "bible.md"), "w").write(bible_md(b))
+    log("bible: %s (%s, %d beats, ~%.0fs)" % (b["title"], b["town_name"], len(b["beats"]), b["est_seconds"]))
+
 def stage_condense(a):
-    from .condense import condense
-    story = open(a.story).read() if a.story else ""
-    spec = condense(story, log=log, notes=a.notes or "", mode=a.mode)
+    if a.mode == "in_this_town":
+        from .town import make_spec
+        if not os.path.exists(os.path.join(a.dir, "bible.json")): sys.exit("in_this_town: run the bible stage first and approve bible.md")
+        spec = make_spec(load(a.dir, "bible.json"), notes=a.notes or "", log=log)
+    else:
+        from .condense import condense
+        story = open(a.story).read() if a.story else ""
+        spec = condense(story, log=log, notes=a.notes or "", mode=a.mode)
     if a.voice: spec["voice"] = a.voice
     if a.speed: spec["speed"] = a.speed
     os.makedirs(a.dir, exist_ok=True)
@@ -103,7 +132,13 @@ def stage_preview(a):
     out = os.path.join(a.dir, "preview.png"); sheet.save(out); log("preview:", out)
 
 def stage_all(a):
-    if a.story or a.mode != "reddit_story": stage_condense(a)
+    if a.mode == "in_this_town":
+        have = lambda f: os.path.exists(os.path.join(a.dir, f))
+        if a.story: stage_bible(a); stage_condense(a)  # all steps at once: no approval stop
+        elif not have("spec.json"):
+            if not have("bible.json"): return stage_pitch(a)   # no rule yet: pitch and stop
+            stage_condense(a)
+    elif a.story: stage_condense(a)
     stage_narrate(a)
     parts = a.parts
     procs = [subprocess.Popen([sys.executable, "-m", "shortsbot.story", "render", "--dir", a.dir, "--part", str(k), "--parts", str(parts)])
@@ -113,13 +148,15 @@ def stage_all(a):
 
 def main(argv=None):
     p = argparse.ArgumentParser(prog="shortsbot.story")
-    p.add_argument("stage", choices=["condense", "narrate", "render", "assemble", "deliver", "all", "preview"])
+    p.add_argument("stage", choices=["pitch", "bible", "condense", "narrate", "render", "assemble", "deliver", "all", "preview"])
     p.add_argument("--dir", default="work")
     p.add_argument("--mode", default="reddit_story", choices=["reddit_story", "in_this_town"])
     p.add_argument("--story"); p.add_argument("--notes"); p.add_argument("--voice"); p.add_argument("--speed", type=float)
+    p.add_argument("--runtime", type=int, help="in_this_town: target seconds (default 75)")
+    p.add_argument("--town-name", help="in_this_town: town name (default: Claude invents one)")
     p.add_argument("--part", type=int, default=0); p.add_argument("--parts", type=int, default=os.cpu_count() or 2)
     a = p.parse_args(argv)
-    {"condense": stage_condense, "narrate": stage_narrate, "render": stage_render, "assemble": stage_assemble, "deliver": stage_deliver,
+    {"pitch": stage_pitch, "bible": stage_bible, "condense": stage_condense, "narrate": stage_narrate, "render": stage_render, "assemble": stage_assemble, "deliver": stage_deliver,
      "all": stage_all, "preview": stage_preview}[a.stage](a)
 
 if __name__ == "__main__":

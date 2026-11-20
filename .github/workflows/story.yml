@@ -1,9 +1,11 @@
 name: story
 
-# Modes: reddit_story (paste a post), in_this_town (premise, optional), what_if (premise, optional) -> TikTok inbox draft.
+# Modes: reddit_story (paste a post), in_this_town (town rule, optional), what_if (premise, optional) -> TikTok inbox draft.
+# in_this_town stops at two checkpoints: no rule -> 10 pitched rules; rule -> story bible to approve. Re-run with
+# from_run=<bible run> and approved=true to render it (or approved=true on the first run to do everything at once).
 # Start it with the terminal command (scripts/story), from Actions -> story -> Run workflow, or:
 #   gh workflow run story.yml -f story="$(pbpaste)"
-#   gh workflow run story.yml -f mode=in_this_town -f story="everyone parties except me"
+#   gh workflow run story.yml -f mode=in_this_town -f story="In this town, your hair turns gray when you stop being curious."
 #   gh workflow run story.yml -f example=story_cat -f send_to_inbox=false      # skip Claude, use examples/story_cat.json
 run-name: "${{ inputs.mode || 'reddit_story' }}: ${{ inputs.label || inputs.example || inputs.from_run || 'new video' }}"
 
@@ -16,7 +18,7 @@ on:
         options: [reddit_story, in_this_town, what_if]
         default: reddit_story
       story:
-        description: "reddit_story: the Reddit post. in_this_town / what_if: a premise (optional)"
+        description: "reddit_story: the Reddit post. in_this_town: the town rule (empty: pitch 10). what_if: a premise (optional)"
         type: string
         default: ""
       example:
@@ -27,8 +29,21 @@ on:
         description: "Re-render: id of an earlier run whose spec to reuse (leave empty)"
         type: string
         default: ""
+      approved:
+        description: "in_this_town: render without stopping for bible approval (or render the bible from from_run)"
+        type: boolean
+        default: false
+      runtime:
+        description: "in_this_town: target length in seconds"
+        type: choice
+        options: ["20", "45", "60", "75", "90", "150"]
+        default: "75"
+      town_name:
+        description: "in_this_town: town name (empty: Claude invents one)"
+        type: string
+        default: ""
       notes:
-        description: "Optional notes for Claude (tone, what to emphasize)"
+        description: "Optional notes for Claude (tone, what to emphasize; for a bible from from_run: the tweaks)"
         type: string
         default: ""
       voice:
@@ -78,16 +93,18 @@ jobs:
     timeout-minutes: 10
     outputs:
       parts: ${{ steps.parts.outputs.list }}
+      stage: ${{ steps.condense.outputs.stage }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "${{ env.PYTHON }}", cache: pip }
       - run: pip install anthropic
-      - name: Spec from an earlier run
+      - name: Spec or bible from an earlier run
         if: inputs.from_run != ''
         uses: actions/download-artifact@v4
-        with: { name: spec, path: work, run-id: "${{ inputs.from_run }}", github-token: "${{ github.token }}" }
-      - name: Post -> spec.json
+        with: { pattern: "{spec,bible}", merge-multiple: true, path: work, run-id: "${{ inputs.from_run }}", github-token: "${{ github.token }}" }
+      - name: Post / rule -> pitches, bible or spec
+        id: condense
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SHORTSBOT_MODEL: ${{ vars.SHORTSBOT_MODEL || 'claude-sonnet-5-5' }}
@@ -96,9 +113,28 @@ jobs:
           NOTES: ${{ inputs.notes }}
           VOICE: ${{ inputs.voice }}
           MODE: ${{ inputs.mode || 'reddit_story' }}
+          APPROVED: ${{ inputs.approved }}
+          RUNTIME: ${{ inputs.runtime || '75' }}
+          TOWN_NAME: ${{ inputs.town_name }}
         run: |
           mkdir -p work
-          if [ -f work/spec.json ]; then
+          stage=spec
+          if [ "$MODE" = in_this_town ] && [ ! -f work/spec.json ] && [ -z "$EXAMPLE" ]; then
+            # checkpoints: pitch (no rule) -> bible (approve) -> spec
+            args=(--mode in_this_town --dir work --runtime "$RUNTIME")
+            [ -n "$NOTES" ] && args+=(--notes "$NOTES")
+            if [ -f work/bible.json ] && [ "$APPROVED" = true ]; then
+              echo "rendering the approved bible from run ${{ inputs.from_run }}"
+              python -m shortsbot.story condense "${args[@]}"
+            elif [ -z "$STORY" ] && [ ! -f work/bible.json ]; then
+              python -m shortsbot.story pitch "${args[@]}"; stage=pitch
+            else
+              if [ -n "$STORY" ]; then printf '%s\n' "$STORY" > work/rule.txt; args+=(--story work/rule.txt); rm -f work/bible.json; fi
+              [ -n "$TOWN_NAME" ] && args+=(--town-name "$TOWN_NAME")
+              python -m shortsbot.story bible "${args[@]}"; stage=bible
+              if [ "$APPROVED" = true ]; then python -m shortsbot.story condense "${args[@]}"; stage=spec; fi
+            fi
+          elif [ -f work/spec.json ]; then
             echo "using spec from run ${{ inputs.from_run }}"
           elif [ -n "$EXAMPLE" ] && [ -z "$STORY" ]; then
             cp "examples/${EXAMPLE%.json}.json" work/spec.json
@@ -109,11 +145,30 @@ jobs:
             [ -n "$NOTES" ] && args+=(--notes "$NOTES")
             python -m shortsbot.story "${args[@]}"
           fi
+          echo "stage=$stage" >> "$GITHUB_OUTPUT"
+          [ "$stage" = spec ] || exit 0
           if [ "$VOICE" != "auto" ]; then jq --arg v "$VOICE" '.voice=$v' work/spec.json > work/s && mv work/s work/spec.json; fi
           python -c "import json,sys; from shortsbot.story.spec import validate; e=validate(json.load(open('work/spec.json'))); sys.exit('\n'.join(e) if e else 0)"
       - id: parts
         run: echo "list=$(jq -cn --argjson n ${{ inputs.parts }} '[range($n)]')" >> "$GITHUB_OUTPUT"
+      - name: Checkpoint summary
+        if: steps.condense.outputs.stage != 'spec'
+        run: |
+          if [ "${{ steps.condense.outputs.stage }}" = pitch ]; then
+            cat work/pitches.md
+            echo; echo "Pick one and run again with it as the story (or use scripts/story --mode in_this_town)."
+          else
+            cat work/bible.md
+            echo; echo "**Approve:** run again with from_run=${{ github.run_id }} and approved=true. **Tweak:** from_run=${{ github.run_id }}, approved=false and your notes."
+          fi >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: steps.condense.outputs.stage == 'pitch'
+        with: { name: pitches, path: "work/pitches.json\nwork/pitches.md", retention-days: 7 }
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('work/bible.json') != ''
+        with: { name: bible, path: "work/bible.json\nwork/bible.md", retention-days: 7 }
       - name: Summary
+        if: steps.condense.outputs.stage == 'spec'
         run: |
           {
             echo "## $(jq -r .title work/spec.json)"
@@ -121,11 +176,13 @@ jobs:
             jq -r '.lines | to_entries[] | "| \(.key + 1) | \(.value.scene) | \(.value.text) |"' work/spec.json
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
+        if: steps.condense.outputs.stage == 'spec'
         with: { name: spec, path: work/spec.json, retention-days: 7 }
 
   narrate:
     name: "2 · narrate (Kokoro TTS)"
     needs: condense
+    if: needs.condense.outputs.stage == 'spec'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
